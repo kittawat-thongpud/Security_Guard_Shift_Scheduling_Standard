@@ -3,9 +3,6 @@ name = "security-guard-shift-scheduling-standard"
 compatibility_date = "2025-10-28"
 compatibility_flags = ["nodejs_compat"]
 
-# serve Vite build output (optional but common)
-assets = { directory = "./dist", binding = "ASSETS" }
-
 # attach the Worker to your hostname
 [[routes]]
 pattern = "guardschedulator.kittawat.qzz.io"
