@@ -1,0 +1,10 @@
+name = "security-guard-shift-scheduling-standard"
+compatibility_date = "2025-10-28"
+compatibility_flags = ["nodejs_compat"]
+
+# For Vite projects with @cloudflare/vite-plugin
+# The plugin automatically configures the worker for you
+
+# Environment variables (optional)
+# [vars]
+# MY_VARIABLE = "my-value"
