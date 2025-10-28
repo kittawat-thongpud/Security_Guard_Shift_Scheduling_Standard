@@ -1,10 +1,12 @@
+# wrangler.toml
 name = "security-guard-shift-scheduling-standard"
 compatibility_date = "2025-10-28"
 compatibility_flags = ["nodejs_compat"]
 
-# For Vite projects with @cloudflare/vite-plugin
-# The plugin automatically configures the worker for you
+# serve Vite build output (optional but common)
+assets = { directory = "./dist", binding = "ASSETS" }
 
-# Environment variables (optional)
-# [vars]
-# MY_VARIABLE = "my-value"
+# attach the Worker to your hostname
+[[routes]]
+pattern = "guardschedulator.kittawat.qzz.io"
+custom_domain = true
