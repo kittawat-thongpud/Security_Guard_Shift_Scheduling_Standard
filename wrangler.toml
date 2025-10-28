@@ -3,6 +3,12 @@ name = "security-guard-shift-scheduling-standard"
 compatibility_date = "2025-10-28"
 compatibility_flags = ["nodejs_compat"]
 
+# Enable workers.dev subdomain
+workers_dev = true
+
+# Enable preview URLs
+preview_urls = true
+
 # attach the Worker to your hostname
 [[routes]]
 pattern = "guardschedulator.kittawat.qzz.io"
