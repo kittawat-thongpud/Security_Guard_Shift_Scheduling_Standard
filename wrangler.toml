@@ -1,4 +1,4 @@
-name = "security-guard-shift-scheduling-standard"
+name = "guardschedulator"
 compatibility_date = "2025-10-28"
 compatibility_flags = ["nodejs_compat"]
 
