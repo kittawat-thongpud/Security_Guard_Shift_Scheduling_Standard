@@ -76,6 +76,77 @@
     .shift-staff{margin-top:8px}
     .shift-empty{margin-top:6px;font-size:.8rem}
     .holiday-empty td{text-align:center;font-style:italic}
+    .holiday-loading td{color:var(--secondary);}
+    .holiday-error{color:var(--error);font-style:normal;font-weight:600}
+
+    .calendar-toolbar{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:flex-end}
+    .calendar-toolbar .toolbar-group{display:flex;flex-direction:column;gap:4px;min-width:120px}
+    .calendar-toolbar label{font-size:.85rem;font-weight:600;color:var(--secondary)}
+    .calendar-toolbar select{padding:8px;border:1px solid #cbd5f5;border-radius:6px;font-size:.95rem}
+    .calendar-toolbar .week-controls{display:flex;align-items:center;gap:8px;flex-direction:row}
+    .calendar-toolbar .week-controls button{padding:6px 12px}
+    .calendar-toolbar .week-controls span{font-size:.9rem;font-weight:600;color:var(--secondary)}
+
+    .calendar-view.week-mode,.calendar-view.month-mode{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+    .calendar-week-header{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px;margin-bottom:4px;font-size:.8rem;font-weight:600;color:var(--secondary);text-transform:uppercase}
+    .calendar-weekday-label{text-align:center;padding:4px 0}
+    .week-row,.month-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px}
+    @media (max-width:900px){
+      .calendar-week-header,.week-row,.month-week{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+      .calendar-toolbar .toolbar-group{flex:1 1 140px}
+    }
+    .personal-calendar{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+    .personal-calendar.week-mode,.personal-calendar.month-mode{display:flex;flex-direction:column;gap:12px}
+    .personal-calendar .calendar-week-header{margin-bottom:8px}
+    .personal-week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px}
+    @media (max-width:900px){
+      .personal-week-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+    }
+    .personal-day-cell{background:var(--surface);border:1px solid #e2e8f0;border-radius:8px;min-height:130px;padding:10px;display:flex;flex-direction:column;gap:6px;transition:border-color .2s,box-shadow .2s}
+    .personal-day-cell.has-data{cursor:pointer}
+    .personal-day-cell.has-data:hover{border-color:var(--primary);box-shadow:0 2px 5px rgba(37,99,235,.12)}
+    .personal-day-cell.weekend{background:#f8fafc}
+    .personal-day-cell.holiday{border-color:var(--warning)}
+    .personal-day-cell.out-month{opacity:.5}
+    .personal-day-cell.day-off{border-color:#34d399;background:#ecfdf5}
+    .personal-day-header{display:flex;justify-content:space-between;font-size:.85rem;font-weight:600;color:var(--secondary)}
+    .personal-shift-tags{display:flex;flex-direction:column;gap:6px;font-size:.8rem}
+    .personal-shift-tag{padding:4px 6px;border-radius:4px;font-weight:600}
+    .personal-shift-tag.role-guard{background:#dbeafe;color:#1e40af}
+    .personal-shift-tag.role-supervisor{background:#f3e8ff;color:#7e22ce}
+    .personal-shift-tag.role-senior{background:#fef3c7;color:#b45309}
+    .personal-dayoff-tag{background:#d1fae5;color:#047857;padding:4px 6px;border-radius:4px;font-weight:600}
+    .personal-empty{font-size:.8rem;color:#94a3b8}
+
+    .day-assignments{margin-top:16px;display:flex;flex-direction:column;gap:16px}
+    .assignment-editor{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:12px}
+    .assignment-editor-head{display:flex;justify-content:space-between;align-items:center}
+    .assignment-editor-head h3{font-size:1rem}
+    .assignment-role{display:flex;flex-direction:column;gap:8px}
+    .assignment-role-title{font-weight:600;color:var(--secondary);display:flex;justify-content:space-between;align-items:center}
+    .assignment-chip-list{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .assignment-chip{display:inline-flex;align-items:center;gap:4px;background:#e2e8f0;border-radius:9999px;padding:4px 8px;font-size:.85rem}
+    .assignment-chip button{background:transparent;border:none;color:#ef4444;cursor:pointer;font-size:.85rem}
+    .assignment-add{display:flex;gap:8px;align-items:center}
+    .assignment-add select{padding:6px 8px;border:1px solid #cbd5f5;border-radius:6px}
+    .day-card{background:var(--surface);border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.08);padding:12px;min-height:160px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s,box-shadow .2s}
+    .day-card.has-data{cursor:pointer}
+    .day-card.has-data:hover{border-color:var(--primary);box-shadow:0 2px 6px rgba(37,99,235,.12)}
+    .day-card.weekend{background:#f8fafc}
+    .day-card.holiday{border-color:var(--warning)}
+    .day-card.out-month{opacity:.55}
+    .day-card-header{display:flex;justify-content:space-between;align-items:center}
+    .day-card-title{font-weight:600;color:var(--secondary)}
+    .day-card-date{font-size:1.4rem;font-weight:700;color:var(--text)}
+    .day-card-meta{display:flex;flex-wrap:wrap;gap:6px}
+    .day-card-body{display:flex;flex-direction:column;gap:8px;flex:1;overflow:auto}
+    .shift-summary{border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#f8fafc;display:flex;flex-direction:column;gap:6px}
+    .shift-summary-header{display:flex;justify-content:space-between;gap:8px;font-size:.9rem}
+    .shift-summary-header strong{font-size:1rem;color:var(--text)}
+    .shift-summary-metric{font-size:.85rem;color:var(--secondary)}
+    .chip.role-guard{background:#dbeafe;color:#1e40af}
+    .chip.role-supervisor{background:#f3e8ff;color:#7e22ce}
+    .chip.role-senior{background:#fef3c7;color:#d97706}
 
     .person-card{background:var(--surface);border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.06);padding:18px;margin-bottom:18px}
     .person-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}

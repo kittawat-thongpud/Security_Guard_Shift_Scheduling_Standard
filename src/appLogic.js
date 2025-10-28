@@ -15,13 +15,6 @@
     return hours * 60 + minutes;
   }
 
-  // ===== Holiday Catalog (static sample) =====
-  const holidayCatalog={
-    TH:{"2024-01-01":"New Year Day","2024-02-10":"Chinese New Year","2024-04-06":"Chakri Day","2024-04-13":"Songkran Festival","2024-04-14":"Songkran Festival","2024-04-15":"Songkran Festival","2024-05-01":"Labor Day","2024-05-06":"Coronation Day","2024-06-03":"Visakha Bucha Day","2024-07-28":"King's Birthday","2024-08-12":"Queen's Birthday","2024-10-23":"Chulalongkorn Day","2024-12-05":"King's Birthday","2024-12-10":"Constitution Day","2024-12-31":"New Year Eve"},
-    US:{"2024-01-01":"New Year's Day","2024-07-04":"Independence Day","2024-11-28":"Thanksgiving Day","2024-12-25":"Christmas Day"},
-    UK:{"2024-01-01":"New Year's Day","2024-04-01":"Easter Monday","2024-05-06":"Early May Bank Holiday","2024-12-25":"Christmas Day","2024-12-26":"Boxing Day"}
-  };
-
   const roleLabels={ guard:'Guard', supervisor:'Supervisor', senior:'Senior Guard' };
   const roleTaskTemplates={
     guard:[
@@ -41,32 +34,205 @@
     ]
   };
 
+  const dayNamesShort=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayNamesLong=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const monthNamesFull=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const HOLIDAY_API_ENDPOINT='https://date.nager.at/api/v3/PublicHolidays';
+  const holidayCache=new Map();
+  let holidayFetchToken=0;
+
+  const CONFIG_COOKIE_NAME='sgss_config_v1';
+  const CONFIG_COOKIE_EXPIRY_DAYS=14;
+  let isApplyingConfiguration=false;
+  let autoPersistTimer=null;
+
+  const LOCAL_HOLIDAY_FALLBACK={
+    TH:{
+      2024:[
+        {date:'2024-01-01',name:'New Year Day'},
+        {date:'2024-02-10',name:'Chinese New Year'},
+        {date:'2024-04-06',name:'Chakri Day'},
+        {date:'2024-04-13',name:'Songkran Festival'},
+        {date:'2024-04-14',name:'Songkran Festival'},
+        {date:'2024-04-15',name:'Songkran Festival'},
+        {date:'2024-05-01',name:'Labor Day'},
+        {date:'2024-05-06',name:'Coronation Day'},
+        {date:'2024-06-03',name:'Visakha Bucha Day'},
+        {date:'2024-07-28',name:"King's Birthday"},
+        {date:'2024-08-12',name:"Queen's Birthday"},
+        {date:'2024-10-23',name:'Chulalongkorn Day'},
+        {date:'2024-12-05',name:"King's Birthday"},
+        {date:'2024-12-10',name:'Constitution Day'},
+        {date:'2024-12-31',name:'New Year Eve'}
+      ],
+      2025:[
+        {date:'2025-01-01',name:'New Year Day'},
+        {date:'2025-04-13',name:'Songkran Festival'},
+        {date:'2025-04-14',name:'Songkran Festival'},
+        {date:'2025-04-15',name:'Songkran Festival'},
+        {date:'2025-05-01',name:'Labor Day'},
+        {date:'2025-07-28',name:"King's Birthday"},
+        {date:'2025-08-12',name:"Queen's Birthday"},
+        {date:'2025-10-23',name:'Chulalongkorn Day'},
+        {date:'2025-12-05',name:"King's Birthday"},
+        {date:'2025-12-10',name:'Constitution Day'},
+        {date:'2025-12-31',name:'New Year Eve'}
+      ]
+    },
+    US:{
+      2024:[
+        {date:'2024-01-01',name:"New Year's Day"},
+        {date:'2024-07-04',name:'Independence Day'},
+        {date:'2024-11-28',name:'Thanksgiving Day'},
+        {date:'2024-12-25',name:'Christmas Day'}
+      ],
+      2025:[
+        {date:'2025-01-01',name:"New Year's Day"},
+        {date:'2025-07-04',name:'Independence Day'},
+        {date:'2025-11-27',name:'Thanksgiving Day'},
+        {date:'2025-12-25',name:'Christmas Day'}
+      ]
+    },
+    UK:{
+      2024:[
+        {date:'2024-01-01',name:"New Year's Day"},
+        {date:'2024-04-01',name:'Easter Monday'},
+        {date:'2024-05-06',name:'Early May Bank Holiday'},
+        {date:'2024-12-25',name:'Christmas Day'},
+        {date:'2024-12-26',name:'Boxing Day'}
+      ],
+      2025:[
+        {date:'2025-01-01',name:"New Year's Day"},
+        {date:'2025-04-21',name:'Easter Monday'},
+        {date:'2025-05-05',name:'Early May Bank Holiday'},
+        {date:'2025-12-25',name:'Christmas Day'},
+        {date:'2025-12-26',name:'Boxing Day'}
+      ]
+    }
+  };
+
+  function getFallbackHolidays(country, years){
+    const countryData=LOCAL_HOLIDAY_FALLBACK[country];
+    if(!countryData) return [];
+    const list=[];
+    years.forEach(year=>{
+      if(countryData[year]){ list.push(...countryData[year]); }
+    });
+    return list;
+  }
+
+  function setCookie(name,value,days){
+    if(typeof document==='undefined') return;
+    const expires=new Date(Date.now()+days*86400000).toUTCString();
+    document.cookie=name+'='+value+'; expires='+expires+'; path=/';
+  }
+
+  function getCookie(name){
+    if(typeof document==='undefined') return '';
+    const parts=document.cookie.split(';').map(part=>part.trim());
+    const prefix=name+'=';
+    for(const part of parts){
+      if(part.startsWith(prefix)){ return part.substring(prefix.length); }
+    }
+    return '';
+  }
+
+  function queueAutoPersist(){
+    if(isApplyingConfiguration) return;
+    if(autoPersistTimer){ clearTimeout(autoPersistTimer); }
+    autoPersistTimer=setTimeout(()=>{
+      autoPersistTimer=null;
+      persistConfiguration();
+    }, 600);
+  }
+
+  function holidayCacheKey(country, year){ return `${country}-${year}`; }
+
+  async function fetchHolidayCatalog(country, year){
+    const key=holidayCacheKey(country, year);
+    if(holidayCache.has(key)){ return holidayCache.get(key); }
+    const url=`${HOLIDAY_API_ENDPOINT}/${year}/${country}`;
+    const pending=fetch(url).then(async res=>{
+      if(!res.ok){ throw new Error(`Failed to load holidays for ${country} ${year}: ${res.status}`); }
+      const raw=await res.text();
+      if(!raw){ return []; }
+      let data;
+      try{
+        data=JSON.parse(raw);
+      }catch(parseErr){
+        throw new Error(`Holiday API returned invalid JSON for ${country} ${year}`);
+      }
+      if(!Array.isArray(data)) return [];
+      return data.map(item=>({
+        date:item.date,
+        name:item.localName || item.name || 'Holiday'
+      }));
+    });
+    holidayCache.set(key, pending);
+    try{
+      return await pending;
+    }catch(err){
+      holidayCache.delete(key);
+      throw err;
+    }
+  }
+
+  function removeHolidayPlaceholders(body){
+    qsa('.holiday-empty', body || document).forEach(el=>el.remove());
+  }
+
+  function ensureHolidayPlaceholder(body, message, className='muted'){
+    if(!body) return;
+    removeHolidayPlaceholders(body);
+    const row=document.createElement('tr');
+    row.className='holiday-empty';
+    row.innerHTML=`<td colspan="3" class="${className}">${message}</td>`;
+    body.appendChild(row);
+  }
+
+  function removeDefaultHolidayRows(body){
+    if(!body) return;
+    qsa('tr', body).forEach(tr=>{
+      if(tr.dataset && tr.dataset.source==='default'){ tr.remove(); }
+    });
+  }
+
   // ===== Shifts =====
   function getGlobalShiftNames(){return qsa('#shiftTableBody > tr').map(r=> (r.querySelector('td:nth-child(1) input')?.value||'').trim()).filter(Boolean);}  
   function updateEndTimeRow(row){ if(!row) return; const s=row.querySelector('.shift-start'); const z=row.querySelector('.shift-size'); const e=row.querySelector('.shift-end'); if(!(s&&z&&e)) return; const hrs=parseInt(z.value||'8',10); e.value=addHoursToTime(s.value||'00:00',hrs); }
 
-  function addShift(){
+  function addShift(shiftData={}){
     const tbody=qs('#shiftTableBody');
     const tr=document.createElement('tr');
+    const name=shiftData.name||'';
+    const start=shiftData.startTime||'08:00';
+    const size=String(shiftData.size||shiftData.shiftSize||shiftData.duration||shiftData.hours||shiftData.length||8);
+    const endValue=shiftData.endTime||addHoursToTime(start, parseInt(size,10)||8);
+    const requirements=shiftData.requirements||{};
+    const reqGuard=requirements.guard ?? shiftData.guard ?? 1;
+    const reqSupervisor=requirements.supervisor ?? shiftData.supervisor ?? 0;
+    const reqSenior=requirements.senior ?? shiftData.senior ?? 0;
     tr.innerHTML=
-      '<td><input type="text" placeholder="Shift name" /></td>'+
-      '<td><input type="time" value="08:00" class="shift-start" /></td>'+
+      '<td><input type="text" placeholder="Shift name" value="'+name+'" /></td>'+
+      '<td><input type="time" value="'+start+'" class="shift-start" /></td>'+
       '<td><select class="shift-size">\
-          <option value="4">4</option><option value="8" selected>8</option>\
-          <option value="12">12</option><option value="24">24</option>\
+          <option value="4"'+(size==='4'?' selected':'')+'>4</option><option value="8"'+(size==='8'?' selected':'')+'>8</option>\
+          <option value="12"'+(size==='12'?' selected':'')+'>12</option><option value="24"'+(size==='24'?' selected':'')+'>24</option>\
          </select></td>'+
-      '<td><input type="time" value="16:00" class="shift-end" disabled /></td>'+
-      '<td><input type="number" value="1" min="0" /></td>'+
-      '<td><input type="number" value="0" min="0" /></td>'+
-      '<td><input type="number" value="0" min="0" /></td>'+
+      '<td><input type="time" value="'+endValue+'" class="shift-end" disabled /></td>'+
+      '<td><input type="number" value="'+reqGuard+'" min="0" /></td>'+
+      '<td><input type="number" value="'+reqSupervisor+'" min="0" /></td>'+
+      '<td><input type="number" value="'+reqSenior+'" min="0" /></td>'+
       '<td><button class="btn btn-secondary" onclick="removeShift(this)">Remove</button></td>';
     tbody.appendChild(tr);
     updateEndTimeRow(tr); // ensure end time correct on insert
+    if(!isApplyingConfiguration) queueAutoPersist();
   }
   function removeShift(btn){
     const row=btn.closest('tr');
     const body=qs('#shiftTableBody');
-    if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); }
+    if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); if(!isApplyingConfiguration) queueAutoPersist(); }
     else{ alert('You need at least one shift pattern.'); }
   }
 
@@ -86,59 +252,172 @@
   }
 
   // ===== Employees CRUD =====
-  function addEmployee(){
+  function addEmployee(employeeData={}){
     const tbody=qs('#employeeTableBody');
     const tr=document.createElement('tr');
+    const name=employeeData.name||'';
+    const role=employeeData.role||'guard';
+    const hours=employeeData.maxWeeklyHours ?? employeeData.maxHours ?? 48;
+    const unavailCSV=Array.isArray(employeeData.unavailableDates)?employeeData.unavailableDates.join(', '):(employeeData.unavailable||'');
+    const prefsCSV=Array.isArray(employeeData.preferredShifts)?employeeData.preferredShifts.join(', '):(employeeData.preferred||'');
+    const spare=!!employeeData.isSpare;
     tr.innerHTML=
-      '<td><input type="text" placeholder="Employee name" /></td>'+
-      '<td><select><option value="guard">Guard</option><option value="supervisor">Supervisor</option><option value="senior">Senior Guard</option></select></td>'+
-      '<td><input type="number" value="48" min="1" /></td>'+
-      '<td><input type="hidden" class="unavail-input" value="" /><div class="chips unavail-preview"><span class="muted">none</span></div></td>'+
-      '<td><input type="hidden" class="prefs-input" value="" /><div class="chips prefs-preview"><span class="muted">none</span></div></td>'+
-      '<td><input type="checkbox" class="spare-flag" /></td>'+
+      '<td><input type="text" placeholder="Employee name" value="'+name+'" /></td>'+
+      '<td><select><option value="guard"'+(role==='guard'?' selected':'')+'>Guard</option><option value="supervisor"'+(role==='supervisor'?' selected':'')+'>Supervisor</option><option value="senior"'+(role==='senior'?' selected':'')+'>Senior Guard</option></select></td>'+
+      '<td><input type="number" value="'+hours+'" min="1" /></td>'+
+      '<td><input type="hidden" class="unavail-input" value="'+(Array.isArray(employeeData.unavailableDates)?employeeData.unavailableDates.join(','):unavailCSV)+'" /><div class="chips unavail-preview"></div></td>'+
+      '<td><input type="hidden" class="prefs-input" value="'+(Array.isArray(employeeData.preferredShifts)?employeeData.preferredShifts.join(','):prefsCSV)+'" /><div class="chips prefs-preview"></div></td>'+
+      '<td><input type="checkbox" class="spare-flag"'+(spare?' checked':'')+' /></td>'+
       '<td><div class="inline"><button class="btn btn-primary" onclick="openEmployeeConfig(this)">Edit</button><button class="btn btn-secondary" onclick="removeEmployee(this)">Remove</button></div></td>';
     tbody.appendChild(tr);
+    updateUnavailPreview(tr);
+    updatePrefsPreview(tr);
+    if(!isApplyingConfiguration) queueAutoPersist();
   } 
   function removeEmployee(btn){
     const row=btn.closest('tr');
     const body=qs('#employeeTableBody');
-    if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); }
+    if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); if(!isApplyingConfiguration) queueAutoPersist(); }
     else{ alert('You need at least one employee.'); }
   }
 
   // ===== Holiday Register =====
-  function addHolidayRow(dateStr='',nameStr=''){
+  function addHolidayRow(dateStr='',nameStr='',source='custom'){
     const body=qs('#holidayTableBody'); if(!body) return;
     const placeholder=body.querySelector('.holiday-empty'); if(placeholder) placeholder.remove();
     const tr=document.createElement('tr');
     tr.innerHTML=
       '<td><input type="date" value="'+dateStr+'" /></td>'+
       '<td><input type="text" placeholder="Holiday name" value="'+nameStr+'" /></td>'+
-      '<td><button class="btn btn-danger" type="button" onclick="this.closest(\'tr\').remove()">Remove</button></td>';
+      '<td><button class="btn btn-danger" type="button" onclick="removeHolidayRow(this)">Remove</button></td>';
+    tr.dataset.source=source;
     body.appendChild(tr);
+    if(!isApplyingConfiguration) queueAutoPersist();
   }  
-  function clearHolidayTable(){ qs('#holidayTableBody').innerHTML=''; }
+  function removeHolidayRow(btn){ const row=btn.closest('tr'); if(row){ row.remove(); if(!qs('#holidayTableBody tr')){ ensureHolidayPlaceholder(qs('#holidayTableBody'),'No public holidays configured.'); } if(!isApplyingConfiguration) queueAutoPersist(); } }
+  function clearHolidayTable(){
+    const body=qs('#holidayTableBody');
+    if(body){
+      body.innerHTML='';
+      if(!isApplyingConfiguration){ ensureHolidayPlaceholder(body,'No public holidays configured.'); }
+    }
+    if(!isApplyingConfiguration) queueAutoPersist();
+  }
   function collectHolidaysFromTable(){ const map={}; qsa('#holidayTableBody tr').forEach(tr=>{ const d=tr.querySelector('input[type=date]')?.value||''; const n=tr.querySelector('input[type=text]')?.value?.trim()||''; if(d){ map[d]=n||'Holiday'; } }); return map; }
-  function loadDefaultHolidaysForCountry(){
+  async function loadDefaultHolidaysForCountry(){
     const body=qs('#holidayTableBody'); if(!body) return;
-    const c=qs('#country')?.value||'TH';
-    const base=holidayCatalog[c]||{}; const s=qs('#startDate')?.value||''; const e=qs('#endDate')?.value||''; const existing=collectHolidaysFromTable();
-    const hasRange=s&&e;
-    let added=0;
-    Object.entries(base).forEach(([d,n])=>{
-      const inRange=!hasRange || (d>=s && d<=e);
-      if(!inRange) return;
-      if(!(d in existing)){ addHolidayRow(d,n); added++; }
-    });
-    const placeholderExisting=body.querySelector('.holiday-empty');
-    if(added===0){
-      if(!placeholderExisting){
-        const row=document.createElement('tr');
-        row.className='holiday-empty';
-        row.innerHTML='<td colspan="3" class="muted">No public holidays within selected period.</td>';
-        body.appendChild(row);
+    removeHolidayPlaceholders(body);
+
+    const country=(qs('#country')?.value||'TH').toUpperCase();
+    const startValue=qs('#startDate')?.value||'';
+    const endValue=qs('#endDate')?.value||'';
+
+    if(!startValue || !endValue){
+      removeDefaultHolidayRows(body);
+      if(!body.querySelector('tr')){
+        ensureHolidayPlaceholder(body,'Set a schedule period to load public holidays.');
       }
-    }else if(placeholderExisting){ placeholderExisting.remove(); }
+      return;
+    }
+
+    if(startValue > endValue){
+      removeDefaultHolidayRows(body);
+      if(!body.querySelector('tr')){
+        ensureHolidayPlaceholder(body,'Adjust the schedule period to a valid range.','holiday-error');
+      }
+      return;
+    }
+
+    const startYear=parseInt(startValue.slice(0,4),10);
+    const endYear=parseInt(endValue.slice(0,4),10);
+    if(Number.isNaN(startYear) || Number.isNaN(endYear)){
+      removeDefaultHolidayRows(body);
+      if(!body.querySelector('tr')){
+        ensureHolidayPlaceholder(body,'Enter valid schedule dates to load holidays.','holiday-error');
+      }
+      return;
+    }
+
+    const years=[];
+    for(let year=startYear; year<=endYear; year++){ years.push(year); }
+
+    console.log('[HolidayLoader] Fetching public holidays', {
+      country,
+      start: startValue,
+      end: endValue,
+      years
+    });
+
+    let loadingRow=null;
+    if(!body.querySelector('tr')){
+      loadingRow=document.createElement('tr');
+      loadingRow.className='holiday-empty holiday-loading';
+      loadingRow.innerHTML='<td colspan="3" class="muted">Loading public holidays…</td>';
+      body.appendChild(loadingRow);
+    }
+
+    const token=++holidayFetchToken;
+    try{
+      const holidayLists=await Promise.all(years.map(year=>fetchHolidayCatalog(country, year)));
+      if(token!==holidayFetchToken) return;
+      const combined=holidayLists.flat();
+      const filtered=combined.filter(item=> item.date>=startValue && item.date<=endValue);
+      const uniqueByDate=new Map();
+      filtered.forEach(item=>{ uniqueByDate.set(item.date, item.name); });
+      const availableDates=new Set(uniqueByDate.keys());
+
+      console.log('[HolidayLoader] Holiday results', {
+        fetched: combined.length,
+        filtered: filtered.length,
+        unique: uniqueByDate.size
+      });
+
+      if(uniqueByDate.size===0){
+        const fallbackEntries=getFallbackHolidays(country, years).filter(item=> item.date>=startValue && item.date<=endValue);
+        if(fallbackEntries.length){
+          fallbackEntries.forEach(item=> uniqueByDate.set(item.date,item.name));
+          console.log('[HolidayLoader] Using fallback holiday dataset', { fallbackCount:fallbackEntries.length });
+          fallbackEntries.forEach(entry=> availableDates.add(entry.date));
+        }
+      }
+
+      qsa('#holidayTableBody tr').forEach(tr=>{
+        if(tr===loadingRow) return;
+        const dateInput=tr.querySelector('input[type=date]');
+        if(!dateInput) return;
+        const dateVal=dateInput.value;
+        const isDefaultRow=tr.dataset.source==='default';
+        if(isDefaultRow && !availableDates.has(dateVal)){ tr.remove(); return; }
+        if(isDefaultRow){
+          const preferredName=uniqueByDate.get(dateVal);
+          const nameInput=tr.querySelector('input[type=text]');
+          if(nameInput && preferredName){ nameInput.value=preferredName; }
+        }
+      });
+
+      let refreshedExisting=collectHolidaysFromTable();
+      uniqueByDate.forEach((name,date)=>{
+        if(!(date in refreshedExisting)){ addHolidayRow(date,name,'default'); }
+      });
+
+      refreshedExisting=collectHolidaysFromTable();
+      if(loadingRow && loadingRow.isConnected){ loadingRow.remove(); }
+      removeHolidayPlaceholders(body);
+      if(Object.keys(refreshedExisting).length===0){
+        ensureHolidayPlaceholder(body,'No public holidays within selected period.');
+      }
+      queueAutoPersist();
+    }catch(error){
+      if(token!==holidayFetchToken) return;
+      if(loadingRow && loadingRow.isConnected){ loadingRow.remove(); }
+      removeDefaultHolidayRows(body);
+      if(!body.querySelector('tr')){
+        ensureHolidayPlaceholder(body,'Unable to load public holidays. Please try again later.','holiday-error');
+      }
+      console.error('[HolidayLoader] Failed to load holidays', error);
+      console.error('Failed to load public holidays', error);
+      if(!isApplyingConfiguration) queueAutoPersist();
+    }
   }
   window.loadDefaultHolidaysForCountry = loadDefaultHolidaysForCountry; // ensure global for onclick
 
@@ -175,16 +454,67 @@
     renderChips(currentEmployeeRow.querySelector('.unavail-preview'),dates);
     renderChips(currentEmployeeRow.querySelector('.prefs-preview'),selectedPrefs);
     closeEmployeeConfig();
+    if(!isApplyingConfiguration) queueAutoPersist();
   }
+  function updateUnavailPreview(row){ const hidden=row.querySelector('.unavail-input'); const values=datesCSVToArray(hidden?.value||''); hidden.value=values.join(', '); renderChips(row.querySelector('.unavail-preview'),values); }
   function updatePrefsPreview(row){ const hidden=row.querySelector('.prefs-input'); const names=getGlobalShiftNames(); const vals=datesCSVToArray(hidden.value).filter(v=>names.includes(v)); hidden.value=vals.join(', '); renderChips(row.querySelector('.prefs-preview'),vals);} 
-  function syncPreferredOptionsToAllEmployees(){ qsa('#employeeTableBody > tr').forEach(updatePrefsPreview); if(currentEmployeeRow){ const inputs=currentEmployeeRow.getElementsByTagName('input'); buildCfgShiftChecks(datesCSVToArray(inputs[3].value)); } }
+  function syncPreferredOptionsToAllEmployees(){ qsa('#employeeTableBody > tr').forEach(row=>{ updateUnavailPreview(row); updatePrefsPreview(row); }); if(currentEmployeeRow){ const inputs=currentEmployeeRow.getElementsByTagName('input'); buildCfgShiftChecks(datesCSVToArray(inputs[3].value)); } }
 
   // ===== Day-off planning =====
-  function planDayOffs(startDate,endDate,employees){ const s=new Date(startDate), e=new Date(endDate); const days=Math.ceil((e-s)/86400000); const map={}; employees.forEach((emp,idx)=>{ const set=new Set((emp.unavailableDates||[])); for(let d=0; d<days; d++){ if((d%7)===(idx%7)){ const dt=new Date(s.getTime()+d*86400000).toISOString().split('T')[0]; set.add(dt);} } map[emp.name]=set; }); return map; }
+  function planDayOffs(startDate,endDate,employees){
+    const start=new Date(startDate);
+    const end=new Date(endDate);
+    if(Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || !Array.isArray(employees)){
+      return {};
+    }
+    const inclusiveDays=Math.max(0, Math.floor((end-start)/86400000))+1;
+    const map={};
+    employees.forEach((emp,idx)=>{
+      if(!emp) return;
+      const key=emp.name??'';
+      const baseUnavailable=Array.isArray(emp.unavailableDates)?emp.unavailableDates:[];
+      const set=new Set(baseUnavailable.filter(Boolean));
+      for(let offset=0; offset<inclusiveDays; offset++){
+        if((offset%7)===(idx%7)){
+          const current=new Date(start.getTime()+offset*86400000);
+          const iso=current.toISOString().split('T')[0];
+          set.add(iso);
+        }
+      }
+      map[key]=set;
+    });
+    return map;
+  }
+
+  function ensureDayOffEntry(map,name){
+    if(!map || typeof map!=='object'){ return new Set(); }
+    const key=name??'';
+    const current=map[key];
+    if(current instanceof Set){ return current; }
+    if(Array.isArray(current)){
+      const normalized=new Set(current.filter(Boolean));
+      map[key]=normalized;
+      return normalized;
+    }
+    if(current && typeof current[Symbol.iterator]==='function'){
+      const normalized=new Set(Array.from(current));
+      map[key]=normalized;
+      return normalized;
+    }
+    const empty=new Set();
+    map[key]=empty;
+    return empty;
+  }
+
+  function isEmployeePlannedOff(map,name,dateISO){
+    if(!dateISO) return false;
+    return ensureDayOffEntry(map,name).has(dateISO);
+  }
   function isTripleEight(shifts){ if(shifts.length!==3) return false; return shifts.every(s=>Math.abs(durationHours(s.startTime,s.endTime)-8)<1e-6); }
   function upgradeFirstLayer12x2(dayShifts, role, dateStr){
-    const normal = scheduleData.employees.filter(e=>e.role===role && !scheduleData.dayOffMap[e.name].has(dateStr) && !e.isSpare);
-    const spares = scheduleData.employees.filter(e=>e.role===role && !scheduleData.dayOffMap[e.name].has(dateStr) && e.isSpare);
+    const dayOffMap=scheduleData.dayOffMap || (scheduleData.dayOffMap={});
+    const normal = scheduleData.employees.filter(e=>e.role===role && !isEmployeePlannedOff(dayOffMap,e.name,dateStr) && !e.isSpare);
+    const spares = scheduleData.employees.filter(e=>e.role===role && !isEmployeePlannedOff(dayOffMap,e.name,dateStr) && e.isSpare);
     const picks=[];
     for(const e of normal){ if(!picks.includes(e.name)){ picks.push(e.name); if(picks.length===2) break; } }
     for(const e of spares){ if(picks.length<2 && !picks.includes(e.name)) picks.push(e.name); }
@@ -204,6 +534,11 @@
 
   // ===== Scheduling =====
   let scheduleData={}; let scheduleResults={};
+  let calendarState={ mode:'week', month:null, year:null, weekIndex:0, weeks:[], availableMonths:[] };
+  let personalRoster=[];
+  let personalState={ employee:null, mode:'week', month:null, year:null, weekIndex:0, weeks:[], availableMonths:[] };
+  let currentDayDetailDate=null;
+  let configurationRestored=false;
   function validateInputs(){ if(!qs('#startDate').value||!qs('#endDate').value) return false; const s=new Date(qs('#startDate').value), e=new Date(qs('#endDate').value); if(s>=e){ alert('End date must be after start date.'); return false;} if(qs('#shiftTableBody').children.length===0){ alert('Define at least one shift.'); return false;} if(qs('#employeeTableBody').children.length===0){ alert('Add at least one employee.'); return false;} return true; }
   function generateSchedule(){
     scheduleData={ startDate:qs('#startDate').value, endDate:qs('#endDate').value, timezone:qs('#timezone').value, country:qs('#country').value, maxWeeklyHours:parseInt(qs('#maxWeeklyHours').value,10), maxConsecutiveDays:parseInt(qs('#maxConsecutiveDays').value,10), minDayOff:parseInt(qs('#minDayOff').value,10), holidays:collectHolidaysFromTable() };
@@ -225,14 +560,17 @@
     scheduleData.dayOffMap=planDayOffs(scheduleData.startDate,scheduleData.endDate,scheduleData.employees);
     executeSchedulingAlgorithm();
     displayResults();
+    persistConfiguration();
   }
   function executeSchedulingAlgorithm(){
     const start=new Date(scheduleData.startDate), end=new Date(scheduleData.endDate);
-    const daysDiff=Math.ceil((end-start)/(1000*60*60*24));
+    const msPerDay=86400000;
+    const daysDiff=Math.max(0, Math.floor((end-start)/msPerDay))+1;
     const schedule=[];
     let totalRequired=0,totalAssigned=0,roleRequirementsMet=0,totalRoleRequirements=0;
     for(let i=0;i<daysDiff;i++){
-      const d=new Date(start); d.setDate(start.getDate()+i); const dateStr=d.toISOString().split('T')[0]; const dayOfWeek=d.getDay();
+      const d=new Date(start.getTime()+i*msPerDay);
+      const dateStr=d.toISOString().split('T')[0]; const dayOfWeek=d.getDay();
       const isWeekend=(dayOfWeek===0||dayOfWeek===6); const holidayName=scheduleData.holidays[dateStr]||'';
       const daySchedule={date:dateStr,dayOfWeek,isWeekend,isHoliday:!!holidayName,holidayName,shifts:[]};
       const dayShifts = scheduleData.shifts.map(sp=>({ name:sp.name, startTime:sp.startTime, endTime:sp.endTime, requirements:{...sp.requirements}, assigned:{guard:[],supervisor:[],senior:[]} }));
@@ -241,13 +579,14 @@
         dayShifts.forEach(shift=>{
           const req=shift.requirements[role]; totalRequired+=req; if(req>0) totalRoleRequirements++;
           const already=new Set(Object.values(shift.assigned).flat());
-          const pool = scheduleData.employees.filter(emp=> emp.role===role && !scheduleData.dayOffMap[emp.name].has(dateStr) && !emp.isSpare);
+          const dayOffMap=scheduleData.dayOffMap || (scheduleData.dayOffMap={});
+          const pool = scheduleData.employees.filter(emp=> emp.role===role && !isEmployeePlannedOff(dayOffMap,emp.name,dateStr) && !emp.isSpare);
           const avail = pool.filter(emp=>!already.has(emp.name));
           let filled=0; const take=Math.min(req, avail.length);
           for(let j=0;j<take;j++){ shift.assigned[role].push(avail[j].name); filled++; }
           let need=req-filled;
           if(need>0){
-            const sparePool=scheduleData.employees.filter(emp=> emp.role===role && !scheduleData.dayOffMap[emp.name].has(dateStr) && emp.isSpare);
+            const sparePool=scheduleData.employees.filter(emp=> emp.role===role && !isEmployeePlannedOff(dayOffMap,emp.name,dateStr) && emp.isSpare);
             const spareAvail=sparePool.filter(emp=>!already.has(emp.name));
             const takeS=Math.min(need, spareAvail.length);
             for(let k=0;k<takeS;k++){ shift.assigned[role].push(spareAvail[k].name); }
@@ -278,137 +617,914 @@
     generateSiteCalendar(); generatePersonalSchedules(); generateConstraintAnalysis();
     qs('#resultsContainer').style.display='block';
   }
-  function generateSiteCalendar(){
-    const cal=qs('#siteCalendar'); cal.innerHTML='';
-    const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    scheduleResults.schedule.forEach(day=>{
+
+  function formatDateISO(date){ return date.toISOString().split('T')[0]; }
+
+  function prepareCalendarState(){
+    const scheduleDays=scheduleResults?.schedule||[];
+    if(!scheduleDays.length){
+      calendarState.availableMonths=[];
+      calendarState.weeks=[];
+      calendarState.month=null;
+      calendarState.year=null;
+      calendarState.weekIndex=0;
+      return;
+    }
+
+    const monthMap=new Map();
+    scheduleDays.forEach(day=>{
       const dObj=new Date(day.date);
-      const dayEl=document.createElement('div'); dayEl.className='calendar-day clickable '+(day.isWeekend?'weekend':'')+' '+(day.isHoliday?'holiday':'');
-      dayEl.addEventListener('click',()=> openDayDetail(day.date));
-      let header='<div class="day-header">'+dayNames[dObj.getDay()]+', '+dObj.getDate()+' '+monthNames[dObj.getMonth()]+'</div>';
-      if(day.isHoliday){ header+='<div style="font-size:.8rem;color:var(--warning);margin-bottom:5px;">'+day.holidayName+'</div>'; }
-      dayEl.innerHTML=header;
-      day.shifts.forEach(shift=>{
-        const totalReq=Object.values(shift.requirements).reduce((a,b)=>a+b,0);
-        const assignedByRole=Object.entries(shift.assigned);
-        const staffList=assignedByRole.flatMap(([role,names])=>names.map(name=>({ role, name })));
-        const totalAsg=staffList.length;
-        const ok=totalAsg>=totalReq;
-        const div=document.createElement('div');
-        div.className='shift-slot '+(ok?'assigned':'unassigned');
-        let staffMarkup='';
-        if(staffList.length){
-          staffMarkup='<div class="chips shift-staff">'+staffList.map(({role,name})=>'<span class="chip role-'+role+'">'+name+'</span>').join('')+'</div>';
-        }else{
-          staffMarkup='<div class="muted shift-empty">No staff assigned</div>';
-        }
-        div.innerHTML='<strong>'+shift.name+'</strong><br>'+shift.startTime+' - '+shift.endTime+'<br>Staff: '+totalAsg+'/'+totalReq+staffMarkup;
-        div.addEventListener('click', (e)=>{ e.stopPropagation(); openDayDetail(day.date); });
-        dayEl.appendChild(div);
-      });
-      cal.appendChild(dayEl);
+      const year=dObj.getFullYear();
+      const month=dObj.getMonth();
+      const key=`${year}-${month}`;
+      if(!monthMap.has(key)){
+        monthMap.set(key,{ year, month, label:`${monthNamesFull[month]} ${year}` });
+      }
     });
+
+    const sortedMonths=Array.from(monthMap.values()).sort((a,b)=> a.year===b.year ? a.month-b.month : a.year-b.year);
+    calendarState.availableMonths=sortedMonths;
+
+    if(!sortedMonths.length){
+      calendarState.weeks=[];
+      calendarState.month=null;
+      calendarState.year=null;
+      calendarState.weekIndex=0;
+      return;
+    }
+
+    const years=Array.from(new Set(sortedMonths.map(m=>m.year))).sort((a,b)=>a-b);
+    if(calendarState.year==null || !years.includes(calendarState.year)){
+      calendarState.year=years[0];
+    }
+
+    let monthsForYear=sortedMonths.filter(m=>m.year===calendarState.year);
+    if(!monthsForYear.length){
+      calendarState.year=sortedMonths[0].year;
+      monthsForYear=sortedMonths.filter(m=>m.year===calendarState.year);
+    }
+
+    if(calendarState.month==null || !monthsForYear.some(m=>m.month===calendarState.month)){
+      calendarState.month=monthsForYear[0].month;
+    }
+
+    calendarState.weeks=buildWeeksForMonth(calendarState.year, calendarState.month);
+    if(calendarState.weeks.length===0){
+      calendarState.weekIndex=0;
+    }else if(calendarState.weekIndex>=calendarState.weeks.length){
+      calendarState.weekIndex=calendarState.weeks.length-1;
+    }
+
+    if(calendarState.mode==='month'){
+      calendarState.weekIndex=0;
+    }
   }
 
-  // ===== Day Detail View =====
-  function openDayDetail(dateStr) {
-    const day = scheduleResults.schedule.find(d => d.date === dateStr);
-    if (!day) return;
-    
-    const dayTitle = qs('#dayTitle');
-    const dayMeta = qs('#dayMeta');
-    const ganttRows = qs('#ganttRows');
-    
-    // Set day title
-    const dObj = new Date(day.date);
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    dayTitle.textContent = `${dayNames[dObj.getDay()]}, ${monthNames[dObj.getMonth()]} ${dObj.getDate()}, ${dObj.getFullYear()}`;
-    
-    // Set day metadata
-    let metaHTML = `<div class="badge">${day.isWeekend ? 'Weekend' : 'Weekday'}</div>`;
-    if (day.isHoliday) {
-      metaHTML += `<div class="badge warn">Holiday: ${day.holidayName}</div>`;
+  function buildWeeksForMonth(year, month){
+    if(typeof year!=='number' || Number.isNaN(year) || typeof month!=='number' || Number.isNaN(month)){
+      return [];
     }
-    dayMeta.innerHTML = metaHTML;
-    
-    // Generate Gantt chart rows
-    ganttRows.innerHTML = '';
-    
-    // Collect all employee assignments for this day
-    const employeeAssignments = {};
-    
-    day.shifts.forEach(shift => {
-      // Add assignments for each role
-      Object.entries(shift.assigned).forEach(([role, employees]) => {
-        employees.forEach(empName => {
-          if (!employeeAssignments[empName]) {
-            employeeAssignments[empName] = [];
-          }
+    const scheduleMap=new Map();
+    (scheduleResults?.schedule||[]).forEach(day=>{
+      scheduleMap.set(day.date, day);
+    });
+
+    const firstDay=new Date(year, month, 1);
+    if(Number.isNaN(firstDay.getTime())) return [];
+    const lastDay=new Date(year, month+1, 0);
+
+    const start=new Date(firstDay);
+    start.setDate(start.getDate()-start.getDay());
+    const end=new Date(lastDay);
+    end.setDate(end.getDate()+(6-end.getDay()));
+
+    const weeks=[];
+    let current=new Date(start);
+    let week=[];
+    while(current<=end){
+      const currentCopy=new Date(current);
+      const iso=formatDateISO(currentCopy);
+      week.push({
+        dateISO: iso,
+        dateObj: currentCopy,
+        inMonth: currentCopy.getMonth()===month,
+        dayData: scheduleMap.get(iso) || null
+      });
+      if(week.length===7){
+        weeks.push(week);
+        week=[];
+      }
+      current.setDate(current.getDate()+1);
+    }
+    return weeks;
+  }
+
+  function updateCalendarControlsUI(){
+    const modeSelect=qs('#calendarMode');
+    if(modeSelect){
+      modeSelect.value=calendarState.mode;
+    }
+
+    const yearSelect=qs('#calendarYear');
+    const monthSelect=qs('#calendarMonth');
+    const weekControls=qs('#calendarWeekControls');
+    const weekLabel=qs('#calendarWeekLabel');
+    const prevBtn=qs('#calendarPrevWeek');
+    const nextBtn=qs('#calendarNextWeek');
+
+    const availableMonths=calendarState.availableMonths||[];
+    const years=Array.from(new Set(availableMonths.map(m=>m.year))).sort((a,b)=>a-b);
+
+    if(yearSelect){
+      yearSelect.innerHTML=years.map(year=>`<option value="${year}">${year}</option>`).join('');
+      if(!years.length){
+        yearSelect.disabled=true;
+      }else{
+        if(!years.includes(calendarState.year)){
+          calendarState.year=years[0];
+        }
+        yearSelect.disabled=false;
+        yearSelect.value=String(calendarState.year);
+      }
+    }
+
+    if(monthSelect){
+      const monthsForYear=availableMonths.filter(m=>m.year===calendarState.year);
+      monthSelect.innerHTML=monthsForYear.map(m=>`<option value="${m.month}">${monthNamesFull[m.month]}</option>`).join('');
+      if(!monthsForYear.length){
+        monthSelect.disabled=true;
+      }else{
+        if(!monthsForYear.some(m=>m.month===calendarState.month)){
+          calendarState.month=monthsForYear[0].month;
+        }
+        monthSelect.disabled=false;
+        monthSelect.value=String(calendarState.month);
+      }
+    }
+
+    if(weekControls){
+      if(calendarState.mode==='week' && calendarState.weeks.length){
+        weekControls.style.display='flex';
+      }else{
+        weekControls.style.display='none';
+      }
+    }
+
+    if(weekLabel){
+      if(calendarState.mode==='week' && calendarState.weeks.length){
+        weekLabel.textContent=`Week ${Math.min(calendarState.weekIndex+1, calendarState.weeks.length)} / ${calendarState.weeks.length}`;
+      }else{
+        weekLabel.textContent='No weeks';
+      }
+    }
+
+    const prevDisabled=calendarState.mode!=='week' || calendarState.weekIndex<=0;
+    if(prevBtn){
+      prevBtn.disabled=prevDisabled;
+      prevBtn.setAttribute('aria-disabled', prevDisabled?'true':'false');
+    }
+    const nextDisabled=calendarState.mode!=='week' || calendarState.weekIndex>=calendarState.weeks.length-1;
+    if(nextBtn){
+      nextBtn.disabled=nextDisabled;
+      nextBtn.setAttribute('aria-disabled', nextDisabled?'true':'false');
+    }
+  }
+
+  function createShiftSummary(shift){
+    const wrapper=document.createElement('div');
+    wrapper.className='shift-summary';
+
+    const header=document.createElement('div');
+    header.className='shift-summary-header';
+    const nameEl=document.createElement('strong');
+    nameEl.textContent=shift.name;
+    const timeEl=document.createElement('span');
+    timeEl.textContent=`${shift.startTime} - ${shift.endTime}`;
+    header.appendChild(nameEl);
+    header.appendChild(timeEl);
+    wrapper.appendChild(header);
+
+    const totalReq=Object.values(shift.requirements||{}).reduce((a,b)=>a+(b||0),0);
+    const staffList=Object.entries(shift.assigned||{}).flatMap(([role,names])=>
+      (names||[]).map(name=>({ role, name }))
+    );
+    const totalAsg=staffList.length;
+
+    const metric=document.createElement('div');
+    metric.className='shift-summary-metric';
+    metric.textContent=`Staff ${totalAsg}/${totalReq}`;
+    wrapper.appendChild(metric);
+
+    if(staffList.length){
+      const chips=document.createElement('div');
+      chips.className='chips shift-staff';
+      staffList.forEach(({role,name})=>{
+        const roleClass=role || 'guard';
+        const chip=document.createElement('span');
+        chip.className=`chip role-${roleClass}`;
+        chip.textContent=name;
+        chips.appendChild(chip);
+      });
+      wrapper.appendChild(chips);
+    }else{
+      const empty=document.createElement('div');
+      empty.className='muted shift-empty';
+      empty.textContent='No staff assigned';
+      wrapper.appendChild(empty);
+    }
+
+    return wrapper;
+  }
+
+  function createWeekdayHeader(){
+    const header=document.createElement('div');
+    header.className='calendar-week-header';
+    dayNamesShort.forEach(name=>{
+      const cell=document.createElement('div');
+      cell.className='calendar-weekday-label';
+      cell.textContent=name;
+      header.appendChild(cell);
+    });
+    return header;
+  }
+
+  function renderDayCard(day){
+    const card=document.createElement('div');
+    card.className='day-card';
+    card.dataset.date=day.dateISO;
+    if(!day.inMonth) card.classList.add('out-month');
+    if(day.dayData?.isWeekend || [0,6].includes(day.dateObj.getDay())) card.classList.add('weekend');
+    if(day.dayData?.isHoliday) card.classList.add('holiday');
+
+    const header=document.createElement('div');
+    header.className='day-card-header';
+    const title=document.createElement('span');
+    title.className='day-card-title';
+    title.textContent=dayNamesShort[day.dateObj.getDay()];
+    const dateEl=document.createElement('span');
+    dateEl.className='day-card-date';
+    dateEl.textContent=day.dateObj.getDate();
+    header.appendChild(title);
+    header.appendChild(dateEl);
+    card.appendChild(header);
+
+    if(day.dayData){
+      card.classList.add('has-data');
+    }else{
+      card.classList.add('no-data');
+    }
+
+    const meta=document.createElement('div');
+    meta.className='day-card-meta';
+    if(day.dayData?.isWeekend){
+      const weekendBadge=document.createElement('span');
+      weekendBadge.className='badge';
+      weekendBadge.textContent='Weekend';
+      meta.appendChild(weekendBadge);
+    }
+    if(day.dayData?.isHoliday){
+      const holidayBadge=document.createElement('span');
+      holidayBadge.className='badge warn';
+      holidayBadge.textContent=day.dayData.holidayName || 'Holiday';
+      meta.appendChild(holidayBadge);
+    }
+    if(meta.childNodes.length){
+      card.appendChild(meta);
+    }
+
+    const body=document.createElement('div');
+    body.className='day-card-body';
+    if(day.dayData && Array.isArray(day.dayData.shifts) && day.dayData.shifts.length){
+      day.dayData.shifts.forEach(shift=>{
+        body.appendChild(createShiftSummary(shift));
+      });
+    }else if(day.inMonth){
+      const empty=document.createElement('p');
+      empty.className='muted';
+      empty.textContent='No shifts scheduled';
+      body.appendChild(empty);
+    }else{
+      const spacer=document.createElement('div');
+      spacer.className='muted';
+      spacer.innerHTML='&nbsp;';
+      body.appendChild(spacer);
+    }
+    card.appendChild(body);
+
+    if(day.dayData){
+      card.addEventListener('click',()=> openDayDetail(day.dateISO));
+    }
+
+    return card;
+  }
+
+  function getSelectedPersonalEmployee(){
+    if(!personalRoster || !personalRoster.length) return null;
+    return personalRoster.find(emp=>emp.name===personalState.employee) || personalRoster[0] || null;
+  }
+
+  function preparePersonalState(){
+    if(!personalRoster.length || !scheduleResults.schedule || !scheduleResults.schedule.length){
+      personalState.employee=null;
+      personalState.availableMonths=[];
+      personalState.weeks=[];
+      personalState.month=null;
+      personalState.year=null;
+      personalState.weekIndex=0;
+      return;
+    }
+
+    const names=personalRoster.map(p=>p.name);
+    if(!personalState.employee || !names.includes(personalState.employee)){
+      personalState.employee=names[0];
+    }
+
+    const monthMap=new Map();
+    (scheduleResults.schedule||[]).forEach(day=>{
+      const dObj=new Date(day.date);
+      if(Number.isNaN(dObj.getTime())) return;
+      const year=dObj.getFullYear();
+      const month=dObj.getMonth();
+      const key=`${year}-${month}`;
+      if(!monthMap.has(key)){
+        monthMap.set(key,{ year, month, label:`${monthNamesFull[month]} ${year}` });
+      }
+    });
+
+    const sortedMonths=Array.from(monthMap.values()).sort((a,b)=> a.year===b.year ? a.month-b.month : a.year-b.year);
+    personalState.availableMonths=sortedMonths;
+
+    if(!sortedMonths.length){
+      personalState.weeks=[];
+      personalState.month=null;
+      personalState.year=null;
+      personalState.weekIndex=0;
+      return;
+    }
+
+    const years=Array.from(new Set(sortedMonths.map(m=>m.year))).sort((a,b)=>a-b);
+    if(personalState.year==null || !years.includes(personalState.year)){
+      personalState.year=years.includes(calendarState.year)?calendarState.year:years[0];
+      if(!years.includes(personalState.year)){
+        personalState.year=years[0];
+      }
+    }
+
+    let monthsForYear=sortedMonths.filter(m=>m.year===personalState.year);
+    if(!monthsForYear.length){
+      personalState.year=sortedMonths[0].year;
+      monthsForYear=sortedMonths.filter(m=>m.year===personalState.year);
+    }
+
+    if(personalState.month==null || !monthsForYear.some(m=>m.month===personalState.month)){
+      personalState.month=monthsForYear[0].month;
+    }
+
+    personalState.weeks=buildWeeksForMonth(personalState.year, personalState.month);
+    if(!personalState.weeks.length){
+      personalState.weekIndex=0;
+      return;
+    }
+
+    const selectedEmployee=getSelectedPersonalEmployee();
+    if(selectedEmployee && selectedEmployee.assignments.length){
+      const assignmentDates=new Set(selectedEmployee.assignments.map(a=>a.date));
+      const weekWithAssignment=personalState.weeks.findIndex(week=>week.some(day=>assignmentDates.has(day.dateISO)));
+      if(weekWithAssignment>=0){ personalState.weekIndex=weekWithAssignment; }
+      if(personalState.weekIndex>=personalState.weeks.length){ personalState.weekIndex=0; }
+    }else if(personalState.weekIndex>=personalState.weeks.length){
+      personalState.weekIndex=0;
+    }
+
+    if(personalState.mode==='month'){
+      personalState.weekIndex=Math.min(Math.max(personalState.weekIndex,0), personalState.weeks.length-1);
+    }
+  }
+
+  function updatePersonalControlsUI(){
+    const employeeSelect=qs('#personalEmployeeSelect');
+    if(employeeSelect){
+      if(personalRoster.length){
+        employeeSelect.innerHTML=personalRoster.map(emp=>`<option value="${emp.name}">${emp.name}</option>`).join('');
+        if(!personalRoster.some(emp=>emp.name===personalState.employee)){
+          personalState.employee=personalRoster[0].name;
+        }
+        employeeSelect.disabled=false;
+        employeeSelect.value=personalState.employee || personalRoster[0].name;
+      }else{
+        employeeSelect.innerHTML='';
+        employeeSelect.disabled=true;
+      }
+    }
+
+    const modeSelect=qs('#personalMode');
+    if(modeSelect){
+      modeSelect.value=personalState.mode;
+      modeSelect.disabled=!personalRoster.length;
+    }
+
+    const availableMonths=personalState.availableMonths||[];
+    const years=Array.from(new Set(availableMonths.map(m=>m.year))).sort((a,b)=>a-b);
+
+    const yearSelect=qs('#personalYear');
+    if(yearSelect){
+      yearSelect.innerHTML=years.map(year=>`<option value="${year}">${year}</option>`).join('');
+      if(!years.length){
+        yearSelect.disabled=true;
+      }else{
+        if(!years.includes(personalState.year)){
+          personalState.year=years[0];
+        }
+        yearSelect.disabled=false;
+        yearSelect.value=String(personalState.year);
+      }
+    }
+
+    const monthSelect=qs('#personalMonth');
+    if(monthSelect){
+      const monthsForYear=availableMonths.filter(m=>m.year===personalState.year);
+      monthSelect.innerHTML=monthsForYear.map(m=>`<option value="${m.month}">${monthNamesFull[m.month]}</option>`).join('');
+      if(!monthsForYear.length){
+        monthSelect.disabled=true;
+      }else{
+        if(!monthsForYear.some(m=>m.month===personalState.month)){
+          personalState.month=monthsForYear[0].month;
+        }
+        monthSelect.disabled=false;
+        monthSelect.value=String(personalState.month);
+      }
+    }
+
+    const weekControls=qs('#personalWeekControls');
+    if(weekControls){
+      weekControls.style.display=(personalState.mode==='week' && personalState.weeks.length)?'flex':'none';
+    }
+    const weekLabel=qs('#personalWeekLabel');
+    if(weekLabel){
+      if(personalState.mode==='week' && personalState.weeks.length){
+        weekLabel.textContent=`Week ${Math.min(personalState.weekIndex+1, personalState.weeks.length)} / ${personalState.weeks.length}`;
+      }else{
+        weekLabel.textContent='No weeks';
+      }
+    }
+    const prevBtn=qs('#personalPrevWeek');
+    const nextBtn=qs('#personalNextWeek');
+    if(prevBtn){
+      const disabled=personalState.mode!=='week' || personalState.weekIndex<=0;
+      prevBtn.disabled=disabled;
+      prevBtn.setAttribute('aria-disabled',disabled?'true':'false');
+    }
+    if(nextBtn){
+      const disabled=personalState.mode!=='week' || personalState.weekIndex>=personalState.weeks.length-1;
+      nextBtn.disabled=disabled;
+      nextBtn.setAttribute('aria-disabled',disabled?'true':'false');
+    }
+  }
+
+  function createPersonalCalendarCell(day, assignments, options={}){
+    const isDayOff=!!options.isDayOff;
+    const cell=document.createElement('div');
+    cell.className='personal-day-cell';
+    if(!day.inMonth) cell.classList.add('out-month');
+    if(day.dayData?.isHoliday) cell.classList.add('holiday');
+    if(day.dayData?.isWeekend || [0,6].includes(day.dateObj.getDay())) cell.classList.add('weekend');
+    if(isDayOff && day.inMonth) cell.classList.add('day-off');
+
+    const header=document.createElement('div');
+    header.className='personal-day-header';
+    header.innerHTML=`<span>${dayNamesShort[day.dateObj.getDay()]}</span><span>${day.dateObj.getDate()}</span>`;
+    cell.appendChild(header);
+
+    const tags=document.createElement('div');
+    tags.className='personal-shift-tags';
+    if(isDayOff && day.inMonth){
+      const dayOffTag=document.createElement('div');
+      dayOffTag.className='personal-dayoff-tag';
+      dayOffTag.textContent='Day Off';
+      tags.appendChild(dayOffTag);
+    }
+    assignments.forEach(assignment=>{
+      const tag=document.createElement('div');
+      const roleClass=assignment.role ? `role-${assignment.role}` : 'role-guard';
+      tag.className=`personal-shift-tag ${roleClass}`;
+      tag.textContent=`${assignment.shiftName} (${assignment.startTime}-${assignment.endTime})`;
+      tags.appendChild(tag);
+    });
+    if(!assignments.length && !isDayOff){
+      const empty=document.createElement('div');
+      empty.className='personal-empty';
+      empty.textContent='No shift';
+      tags.appendChild(empty);
+    }
+    cell.appendChild(tags);
+
+    if(day.dayData){
+      cell.classList.add('has-data');
+      cell.addEventListener('click',()=> openDayDetail(day.dateISO));
+    }
+
+    return cell;
+  }
+
+  function renderPersonalGantt(selectedEmployee){
+    const container=qs('#personalCalendar');
+    if(!container) return;
+    container.classList.remove('week-mode','month-mode');
+
+    if(!personalRoster.length){
+      container.innerHTML='<p class="muted">Add employees to view personal schedules.</p>';
+      return;
+    }
+    if(!scheduleResults.schedule || !scheduleResults.schedule.length){
+      container.innerHTML='<p class="muted">Run the scheduler to view personal schedules.</p>';
+      return;
+    }
+    if(!selectedEmployee){
+      container.innerHTML='<p class="muted">Select an employee to view the Gantt chart.</p>';
+      return;
+    }
+
+    container.classList.add(personalState.mode==='month'?'month-mode':'week-mode');
+    container.innerHTML='';
+
+    const assignmentsByDate=new Map();
+    (selectedEmployee.assignments||[]).forEach(assignment=>{
+      if(!assignmentsByDate.has(assignment.date)){
+        assignmentsByDate.set(assignment.date, []);
+      }
+      assignmentsByDate.get(assignment.date).push(assignment);
+    });
+
+    const dayOffMap=scheduleData.dayOffMap || (scheduleData.dayOffMap={});
+    const dayOffSet=ensureDayOffEntry(dayOffMap,selectedEmployee.name);
+
+    if(!personalState.weeks.length){
+      container.innerHTML='<p class="muted">No schedule data within the selected range.</p>';
+      return;
+    }
+
+    container.appendChild(createWeekdayHeader());
+
+    if(personalState.mode==='month'){
+      personalState.weeks.forEach(week=>{
+        const row=document.createElement('div');
+        row.className='personal-week-grid';
+        week.forEach(day=>{
+          const isDayOff=dayOffSet.has(day.dateISO);
+          row.appendChild(createPersonalCalendarCell(day, assignmentsByDate.get(day.dateISO)||[], { isDayOff }));
+        });
+        container.appendChild(row);
+      });
+    }else{
+      const currentWeek=personalState.weeks[personalState.weekIndex] || personalState.weeks[0];
+      if(currentWeek){
+        const row=document.createElement('div');
+        row.className='personal-week-grid';
+        currentWeek.forEach(day=>{
+          const isDayOff=dayOffSet.has(day.dateISO);
+          row.appendChild(createPersonalCalendarCell(day, assignmentsByDate.get(day.dateISO)||[], { isDayOff }));
+        });
+        container.appendChild(row);
+      }
+    }
+  }
+
+  function renderPersonalView(){
+    updatePersonalControlsUI();
+    const selected=getSelectedPersonalEmployee();
+    renderPersonalGantt(selected);
+  }
+
+  function getEmployeesForRole(role){
+    return (scheduleData.employees||[]).filter(emp=>emp.role===role).map(emp=>emp.name);
+  }
+
+  function renderDayGantt(day){
+    const ganttRows = qs('#ganttRows');
+    if(!ganttRows) return;
+    ganttRows.innerHTML='';
+
+    const employeeAssignments={};
+    day.shifts.forEach(shift=>{
+      Object.entries(shift.assigned||{}).forEach(([role, employees])=>{
+        (employees||[]).forEach(empName=>{
+          if(!employeeAssignments[empName]){ employeeAssignments[empName]=[]; }
           employeeAssignments[empName].push({
-            shiftName: shift.name,
-            role: role,
-            startTime: shift.startTime,
-            endTime: shift.endTime
+            shiftName:shift.name,
+            role,
+            startTime:shift.startTime,
+            endTime:shift.endTime
           });
         });
       });
     });
-    
-    // Create a row for each employee with assignments
-    Object.entries(employeeAssignments).forEach(([empName, assignments]) => {
-      const row = document.createElement('div');
-      row.className = 'gantt-row';
-      
-      // Employee name label
-      const label = document.createElement('div');
-      label.className = 'gantt-label';
-      label.textContent = empName;
+
+    const entries=Object.entries(employeeAssignments);
+    if(!entries.length){
+      const empty=document.createElement('div');
+      empty.className='muted';
+      empty.textContent='No assignments for this day.';
+      ganttRows.appendChild(empty);
+      return;
+    }
+
+    entries.forEach(([empName, assignments])=>{
+      const row=document.createElement('div');
+      row.className='gantt-row';
+
+      const label=document.createElement('div');
+      label.className='gantt-label';
+      label.textContent=empName;
       row.appendChild(label);
-      
-      // Gantt track
-      const track = document.createElement('div');
-      track.className = 'gantt-track';
-      
-      // Add bars for each shift assignment
-      assignments.forEach(assignment => {
-        const bar = document.createElement('div');
-        bar.className = `gantt-bar role-${assignment.role}-bar`;
-        
-        // Calculate position and width based on time
-        const startMinutes = timeToMinutes(assignment.startTime);
-        let endMinutes = timeToMinutes(assignment.endTime);
-        
-        // Handle overnight shifts (end time < start time)
-        if (endMinutes < startMinutes) {
-          endMinutes = 24 * 60; // Show until midnight
-        }
-        
-        const left = (startMinutes / (24 * 60)) * 100;
-        const width = ((endMinutes - startMinutes) / (24 * 60)) * 100;
-        
-        bar.style.left = `${left}%`;
-        bar.style.width = `${width}%`;
-        bar.textContent = `${assignment.shiftName} (${assignment.startTime}-${assignment.endTime})`;
-        
+
+      const track=document.createElement('div');
+      track.className='gantt-track';
+
+      assignments.forEach(assignment=>{
+        const bar=document.createElement('div');
+        bar.className=`gantt-bar role-${assignment.role}-bar`;
+        const startMinutes=timeToMinutes(assignment.startTime);
+        let endMinutes=timeToMinutes(assignment.endTime);
+        if(endMinutes < startMinutes){ endMinutes += 24*60; }
+        const left=(startMinutes/(24*60))*100;
+        const width=((endMinutes-startMinutes)/(24*60))*100;
+        bar.style.left=`${left}%`;
+        bar.style.width=`${width}%`;
+        bar.textContent=`${assignment.shiftName} (${assignment.startTime}-${assignment.endTime})`;
         track.appendChild(bar);
       });
-      
+
       row.appendChild(track);
       ganttRows.appendChild(row);
     });
-    
-    // Show the overlay
+  }
+
+  function renderDayAssignments(day, dayIndex){
+    const container=qs('#dayAssignments');
+    if(!container) return;
+    container.innerHTML='';
+
+    if(!day.shifts || !day.shifts.length){
+      container.innerHTML='<p class="muted">No shifts configured for this day.</p>';
+      return;
+    }
+
+    day.shifts.forEach((shift, shiftIndex)=>{
+      const card=document.createElement('div');
+      card.className='assignment-editor';
+
+      const head=document.createElement('div');
+      head.className='assignment-editor-head';
+      head.innerHTML=`<h3>${shift.name}</h3><span>${shift.startTime} - ${shift.endTime}</span>`;
+      card.appendChild(head);
+
+      const roleKeys=new Set([...Object.keys(shift.requirements||{}), ...Object.keys(shift.assigned||{})]);
+      roleKeys.forEach(role=>{
+        const roleSection=document.createElement('div');
+        roleSection.className='assignment-role';
+
+        const roleTitle=document.createElement('div');
+        roleTitle.className='assignment-role-title';
+        const required=shift.requirements?.[role] ?? 0;
+        roleTitle.innerHTML=`<span>${roleLabels[role]||role}</span><span>Required: ${required}</span>`;
+        roleSection.appendChild(roleTitle);
+
+        const chipList=document.createElement('div');
+        chipList.className='assignment-chip-list';
+        const assignedList=(shift.assigned?.[role]||[]);
+        assignedList.forEach(employeeName=>{
+          const chip=document.createElement('span');
+          chip.className='assignment-chip';
+          chip.textContent=employeeName;
+          const removeBtn=document.createElement('button');
+          removeBtn.type='button';
+          removeBtn.setAttribute('aria-label',`Remove ${employeeName}`);
+          removeBtn.textContent='×';
+          removeBtn.addEventListener('click',()=>{
+            removeAssignmentFromShift(dayIndex, shiftIndex, role, employeeName);
+          });
+          chip.appendChild(removeBtn);
+          chipList.appendChild(chip);
+        });
+        if(!assignedList.length){
+          const empty=document.createElement('span');
+          empty.className='muted';
+          empty.textContent='No assignments';
+          chipList.appendChild(empty);
+        }
+        roleSection.appendChild(chipList);
+
+        const addWrapper=document.createElement('div');
+        addWrapper.className='assignment-add';
+        const select=document.createElement('select');
+        const placeholder=document.createElement('option');
+        placeholder.value='';
+        placeholder.textContent=`Add ${roleLabels[role]||role}`;
+        select.appendChild(placeholder);
+        const existing=new Set((shift.assigned?.[role]||[]));
+        getEmployeesForRole(role).forEach(name=>{
+          if(existing.has(name)) return;
+          const option=document.createElement('option');
+          option.value=name;
+          option.textContent=name;
+          select.appendChild(option);
+        });
+        select.addEventListener('change',event=>{
+          const value=event.target.value;
+          if(value){
+            addAssignmentToShift(dayIndex, shiftIndex, role, value);
+            event.target.value='';
+          }
+        });
+        addWrapper.appendChild(select);
+        if(select.options.length===1){
+          select.disabled=true;
+          const noOptions=document.createElement('span');
+          noOptions.className='muted';
+          noOptions.textContent='No available employees';
+          addWrapper.appendChild(noOptions);
+        }
+        roleSection.appendChild(addWrapper);
+
+        card.appendChild(roleSection);
+      });
+
+      container.appendChild(card);
+    });
+  }
+
+  function addAssignmentToShift(dayIndex, shiftIndex, role, employeeName){
+    const day=scheduleResults?.schedule?.[dayIndex];
+    if(!day) return;
+    const shift=day.shifts?.[shiftIndex];
+    if(!shift) return;
+    if(!shift.assigned[role]){ shift.assigned[role]=[]; }
+    if(!shift.assigned[role].includes(employeeName)){
+      shift.assigned[role].push(employeeName);
+      refreshAfterAssignmentChange();
+    }
+  }
+
+  function removeAssignmentFromShift(dayIndex, shiftIndex, role, employeeName){
+    const day=scheduleResults?.schedule?.[dayIndex];
+    if(!day) return;
+    const shift=day.shifts?.[shiftIndex];
+    if(!shift || !shift.assigned?.[role]) return;
+    const idx=shift.assigned[role].indexOf(employeeName);
+    if(idx!==-1){
+      shift.assigned[role].splice(idx,1);
+      refreshAfterAssignmentChange();
+    }
+  }
+
+  function recalculateScheduleMetrics(){
+    if(!scheduleResults || !Array.isArray(scheduleResults.schedule)) return;
+    let totalRequired=0;
+    let totalAssigned=0;
+    let roleRequirementsMet=0;
+    let totalRoleRequirements=0;
+
+    scheduleResults.schedule.forEach(day=>{
+      day.shifts.forEach(shift=>{
+        Object.entries(shift.requirements||{}).forEach(([role, req])=>{
+          const requirement=parseInt(req||0,10);
+          const assignedCount=(shift.assigned?.[role]||[]).length;
+          totalRequired+=requirement;
+          if(requirement>0){ totalRoleRequirements+=1; }
+          totalAssigned+=Math.min(assignedCount, requirement);
+          if(assignedCount>=requirement){ roleRequirementsMet+=1; }
+        });
+      });
+    });
+
+    const coverageRate=totalRequired>0?Math.round((totalAssigned/totalRequired)*100):0;
+    const roleCompliance=totalRoleRequirements>0?Math.round((roleRequirementsMet/totalRoleRequirements)*100):0;
+    const prevMetrics=scheduleResults.metrics||{};
+    scheduleResults.metrics={
+      coverageRate,
+      roleCompliance,
+      constraintCompliance: prevMetrics.constraintCompliance ?? 95,
+      processingTime: prevMetrics.processingTime ?? 500
+    };
+
+    const coverageEl=qs('#coverageRate'); if(coverageEl) coverageEl.textContent=coverageRate+'%';
+    const roleEl=qs('#roleCompliance'); if(roleEl) roleEl.textContent=roleCompliance+'%';
+    const constraintEl=qs('#constraintCompliance'); if(constraintEl) constraintEl.textContent=scheduleResults.metrics.constraintCompliance+'%';
+    const timeEl=qs('#processingTime'); if(timeEl) timeEl.textContent=scheduleResults.metrics.processingTime+'ms';
+  }
+
+  function refreshAfterAssignmentChange(){
+    const currentEmployee=personalState.employee;
+    recalculateScheduleMetrics();
+    generateSiteCalendar();
+    personalState.employee=currentEmployee;
+    generatePersonalSchedules();
+    const stillExists=currentEmployee && personalRoster.some(emp=>emp.name===currentEmployee);
+    if(stillExists && personalState.employee!==currentEmployee){
+      personalState.employee=currentEmployee;
+      renderPersonalView();
+    }
+    if(currentDayDetailDate){
+      const rendered = renderDayDetailView(currentDayDetailDate);
+      if(!rendered){ closeDayDetail(); }
+    }
+  }
+
+  function renderCalendarView(){
+    updateCalendarControlsUI();
+    const container=qs('#siteCalendar');
+    if(!container) return;
+    container.classList.remove('week-mode','month-mode');
+    container.innerHTML='';
+
+    if(!calendarState.weeks.length){
+      container.innerHTML='<p class="muted">No schedule days available. Run the scheduler or adjust filters.</p>';
+      return;
+    }
+
+    container.appendChild(createWeekdayHeader());
+
+    if(calendarState.mode==='month'){
+      container.classList.add('month-mode');
+      calendarState.weeks.forEach(week=>{
+        const row=document.createElement('div');
+        row.className='month-week';
+        week.forEach(day=> row.appendChild(renderDayCard(day)));
+        container.appendChild(row);
+      });
+    }else{
+      container.classList.add('week-mode');
+      const week=calendarState.weeks[calendarState.weekIndex] || [];
+      const row=document.createElement('div');
+      row.className='week-row';
+      week.forEach(day=> row.appendChild(renderDayCard(day)));
+      container.appendChild(row);
+    }
+  }
+
+  function generateSiteCalendar(){
+    const container=qs('#siteCalendar');
+    if(!container) return;
+    if(!scheduleResults.schedule || !scheduleResults.schedule.length){
+      calendarState.availableMonths=[];
+      calendarState.weeks=[];
+      calendarState.month=null;
+      calendarState.year=null;
+      calendarState.weekIndex=0;
+      updateCalendarControlsUI();
+      container.innerHTML='<p class="muted">Run the scheduler to view the calendar.</p>';
+      return;
+    }
+    prepareCalendarState();
+    renderCalendarView();
+  }
+
+  // ===== Day Detail View =====
+  function renderDayDetailView(dateStr){
+    if(!scheduleResults || !Array.isArray(scheduleResults.schedule)) return false;
+    const dayIndex=scheduleResults.schedule.findIndex(d=>d.date===dateStr);
+    if(dayIndex===-1) return false;
+    const day=scheduleResults.schedule[dayIndex];
+
+    const dayTitle = qs('#dayTitle');
+    if(dayTitle){
+      const dObj = new Date(day.date);
+      dayTitle.textContent = `${dayNamesLong[dObj.getDay()]}, ${monthNamesFull[dObj.getMonth()]} ${dObj.getDate()}, ${dObj.getFullYear()}`;
+    }
+
+    const dayMeta = qs('#dayMeta');
+    if(dayMeta){
+      let metaHTML = `<div class="badge">${day.isWeekend ? 'Weekend' : 'Weekday'}</div>`;
+      if (day.isHoliday) {
+        metaHTML += `<div class="badge warn">Holiday: ${day.holidayName}</div>`;
+      }
+      dayMeta.innerHTML = metaHTML;
+    }
+
+    renderDayGantt(day);
+    renderDayAssignments(day, dayIndex);
+    return true;
+  }
+
+  function openDayDetail(dateStr) {
+    currentDayDetailDate=dateStr;
+    const rendered = renderDayDetailView(dateStr);
     const overlay = qs('#dayDetailOverlay');
-    overlay.style.display = 'block';
-    overlay.setAttribute('aria-hidden', 'false');
+    if (rendered && overlay) {
+      overlay.style.display = 'block';
+      overlay.setAttribute('aria-hidden', 'false');
+    }else if(!rendered){
+      currentDayDetailDate=null;
+    }
   }
   
   function closeDayDetail() {
+    currentDayDetailDate=null;
     const overlay = qs('#dayDetailOverlay');
-    overlay.style.display = 'none';
-    overlay.setAttribute('aria-hidden', 'true');
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.setAttribute('aria-hidden', 'true');
+    }
   }
 
   function formatDisplayDate(dateStr){
@@ -417,8 +1533,21 @@
   }
 
   function generatePersonalSchedules(){
-    const container=qs('#personSchedules'); if(!container) return;
-    container.innerHTML='';
+    const ganttContainer=qs('#personalCalendar');
+    if(ganttContainer){ ganttContainer.innerHTML=''; }
+
+    if(!scheduleResults.schedule || !scheduleResults.schedule.length){
+      personalRoster=[];
+      personalState.employee=null;
+      personalState.availableMonths=[];
+      personalState.weeks=[];
+      personalState.month=null;
+      personalState.year=null;
+      personalState.weekIndex=0;
+      updatePersonalControlsUI();
+      if(ganttContainer){ ganttContainer.innerHTML='<p class="muted">No schedule data available.</p>'; }
+      return;
+    }
 
     const roster={};
     scheduleData.employees.forEach(emp=>{
@@ -444,61 +1573,11 @@
       });
     });
 
-    const people=Object.values(roster).filter(emp=>emp.name);
-    if(people.length===0){
-      container.innerHTML='<p class="muted">Add employees to view personal schedules.</p>';
-      return;
-    }
+    const people=Object.values(roster).filter(emp=>emp.name).sort((a,b)=>a.name.localeCompare(b.name));
+    personalRoster=people;
 
-    people.sort((a,b)=>a.name.localeCompare(b.name));
-
-    people.forEach(person=>{
-      const card=document.createElement('div');
-      card.className='person-card';
-
-      const header=document.createElement('div');
-      header.className='person-header';
-      header.innerHTML='<h3>'+person.name+'</h3><span class="role-badge role-'+person.role+'">'+(roleLabels[person.role]||person.role)+'</span>';
-
-      const body=document.createElement('div');
-      body.className='person-body';
-
-      if(person.assignments.length===0){
-        body.innerHTML='<p class="muted">No shifts assigned during this period.</p>';
-      }else{
-        const sortedAssignments=person.assignments.slice().sort((a,b)=>{
-          if(a.date===b.date){ return a.startTime.localeCompare(b.startTime); }
-          return a.date.localeCompare(b.date);
-        });
-
-        sortedAssignments.forEach(assignment=>{
-          const assignmentBlock=document.createElement('div');
-          assignmentBlock.className='assignment';
-          assignmentBlock.innerHTML='<div class="assignment-title"><strong>'+assignment.shiftName+'</strong><span>'+formatDisplayDate(assignment.date)+' • '+assignment.startTime+' - '+assignment.endTime+'</span></div>';
-
-          const taskList=document.createElement('ul');
-          taskList.className='task-list';
-          const baseTasks=roleTaskTemplates[assignment.role] || roleTaskTemplates.guard;
-          const shiftSpecificTasks=[
-            'Report to post before '+assignment.startTime+'.',
-            ...baseTasks,
-            'Complete handover at '+assignment.endTime+'.'
-          ];
-          shiftSpecificTasks.forEach(task=>{
-            const li=document.createElement('li');
-            li.textContent=task;
-            taskList.appendChild(li);
-          });
-
-          assignmentBlock.appendChild(taskList);
-          body.appendChild(assignmentBlock);
-        });
-      }
-
-      card.appendChild(header);
-      card.appendChild(body);
-      container.appendChild(card);
-    });
+    preparePersonalState();
+    renderPersonalView();
   }
 
   function analyzeConsecutiveDays(dates){
@@ -596,6 +1675,156 @@
       '</table>';
   }
 
+  function gatherConfigurationSnapshot(){
+    try{
+      const config={
+        version:1,
+        meta:{
+          startDate:qs('#startDate')?.value||'',
+          endDate:qs('#endDate')?.value||'',
+          timezone:qs('#timezone')?.value||'',
+          country:qs('#country')?.value||'',
+          maxWeeklyHours:parseInt(qs('#maxWeeklyHours')?.value||'48',10),
+          maxConsecutiveDays:parseInt(qs('#maxConsecutiveDays')?.value||'6',10),
+          minDayOff:parseInt(qs('#minDayOff')?.value||'1',10)
+        },
+        shifts:[],
+        employees:[],
+        holidays:[]
+      };
+
+      qsa('#shiftTableBody > tr').forEach(row=>{
+        const name=row.querySelector('td:nth-child(1) input')?.value||'';
+        const start=row.querySelector('.shift-start')?.value||'';
+        const size=parseInt(row.querySelector('.shift-size')?.value||'8',10);
+        const nums=row.querySelectorAll('input[type="number"]');
+        config.shifts.push({
+          name,
+          startTime:start,
+          size,
+          requirements:{
+            guard:parseInt(nums[0]?.value||'0',10),
+            supervisor:parseInt(nums[1]?.value||'0',10),
+            senior:parseInt(nums[2]?.value||'0',10)
+          }
+        });
+      });
+
+      qsa('#employeeTableBody > tr').forEach(row=>{
+        const inputs=row.getElementsByTagName('input');
+        const selects=row.getElementsByTagName('select');
+        config.employees.push({
+          name:inputs[0]?.value||'',
+          role:selects[0]?.value||'guard',
+          maxWeeklyHours:parseInt(inputs[1]?.value||'48',10),
+          unavailableDates:datesCSVToArray(inputs[2]?.value||''),
+          preferredShifts:datesCSVToArray(inputs[3]?.value||''),
+          isSpare:row.querySelector('.spare-flag')?.checked||false
+        });
+      });
+
+      qsa('#holidayTableBody tr').forEach(row=>{
+        if(row.classList.contains('holiday-empty')) return;
+        const date=row.querySelector('input[type=date]')?.value||'';
+        const name=row.querySelector('input[type=text]')?.value||'';
+        if(date){
+          config.holidays.push({
+            date,
+            name,
+            source:row.dataset.source||'custom'
+          });
+        }
+      });
+
+      return config;
+    }catch(err){
+      console.error('Failed to gather configuration snapshot', err);
+      return null;
+    }
+  }
+
+  function applyConfigurationSnapshot(config){
+    if(!config || typeof config!=='object') return false;
+    isApplyingConfiguration=true;
+    try{
+      if(config.meta){
+        if(config.meta.startDate && qs('#startDate')) qs('#startDate').value=config.meta.startDate;
+        if(config.meta.endDate && qs('#endDate')) qs('#endDate').value=config.meta.endDate;
+        if(config.meta.timezone && qs('#timezone')) qs('#timezone').value=config.meta.timezone;
+        if(config.meta.country && qs('#country')) qs('#country').value=config.meta.country;
+        if(Number.isFinite(config.meta.maxWeeklyHours) && qs('#maxWeeklyHours')) qs('#maxWeeklyHours').value=config.meta.maxWeeklyHours;
+        if(Number.isFinite(config.meta.maxConsecutiveDays) && qs('#maxConsecutiveDays')) qs('#maxConsecutiveDays').value=config.meta.maxConsecutiveDays;
+        if(Number.isFinite(config.meta.minDayOff) && qs('#minDayOff')) qs('#minDayOff').value=config.meta.minDayOff;
+      }
+
+      const shiftBody=qs('#shiftTableBody');
+      if(shiftBody){
+        shiftBody.innerHTML='';
+        const shifts=Array.isArray(config.shifts) && config.shifts.length ? config.shifts : null;
+        if(shifts){ shifts.forEach(shift=>addShift(shift)); } else { addShift(); }
+      }
+
+      const employeeBody=qs('#employeeTableBody');
+      if(employeeBody){
+        employeeBody.innerHTML='';
+        const employees=Array.isArray(config.employees) && config.employees.length ? config.employees : null;
+        if(employees){ employees.forEach(emp=>addEmployee(emp)); } else { addEmployee(); }
+      }
+
+      const holidayBody=qs('#holidayTableBody');
+      if(holidayBody){
+        holidayBody.innerHTML='';
+        if(Array.isArray(config.holidays) && config.holidays.length){
+          config.holidays.forEach(h=> addHolidayRow(h.date, h.name, h.source||'custom'));
+        }else{
+          ensureHolidayPlaceholder(holidayBody,'No public holidays configured.');
+        }
+      }
+
+      syncPreferredOptionsToAllEmployees();
+      return true;
+    }catch(err){
+      console.error('Failed to apply configuration snapshot', err);
+      return false;
+    }finally{
+      isApplyingConfiguration=false;
+    }
+  }
+
+  function persistConfiguration(){
+    if(isApplyingConfiguration) return;
+    if(autoPersistTimer){ clearTimeout(autoPersistTimer); autoPersistTimer=null; }
+    const snapshot=gatherConfigurationSnapshot();
+    if(!snapshot) return;
+    try{
+      const json=JSON.stringify(snapshot);
+      const encoded=encodeURIComponent(json);
+      if(encoded.length>3800){
+        console.warn('Configuration approaching cookie size limit; consider reducing data.');
+      }
+      setCookie(CONFIG_COOKIE_NAME, encoded, CONFIG_COOKIE_EXPIRY_DAYS);
+    }catch(err){
+      console.error('Failed to persist configuration snapshot', err);
+    }
+  }
+
+  function loadConfigurationFromCookie(){
+    const raw=getCookie(CONFIG_COOKIE_NAME);
+    if(!raw) return false;
+    try{
+      const decoded=decodeURIComponent(raw);
+      const parsed=JSON.parse(decoded);
+      const applied=applyConfigurationSnapshot(parsed);
+      if(applied){
+        console.log('[Config] Restored scheduling configuration from cookie.');
+      }
+      return applied;
+    }catch(err){
+      console.error('Failed to load configuration from cookie', err);
+      return false;
+    }
+  }
+
   const exposedHandlers={
     addShift,
     removeShift,
@@ -603,6 +1832,7 @@
     removeEmployee,
     addEmployee,
     addHolidayRow,
+    removeHolidayRow,
     loadDefaultHolidaysForCountry,
     clearHolidayTable,
     switchTab,
@@ -634,7 +1864,7 @@
     if(countrySelect){
       countrySelect.addEventListener('change',()=>{
         clearHolidayTable();
-        loadDefaultHolidaysForCountry();
+        loadDefaultHolidaysForCountry().catch(()=>{});
       });
     }
 
@@ -654,8 +1884,133 @@
       });
     }
 
-    clearHolidayTable();
-    loadDefaultHolidaysForCountry();
+    const modeSelect=qs('#calendarMode');
+    if(modeSelect){
+      modeSelect.addEventListener('change',event=>{
+        const value=event.target.value;
+        calendarState.mode=(value==='month')?'month':'week';
+        if(calendarState.mode==='month'){ calendarState.weekIndex=0; }
+        prepareCalendarState();
+        renderCalendarView();
+      });
+    }
+    const monthSelect=qs('#calendarMonth');
+    if(monthSelect){
+      monthSelect.addEventListener('change',event=>{
+        const nextMonth=parseInt(event.target.value,10);
+        if(!Number.isNaN(nextMonth)){
+          calendarState.month=nextMonth;
+          calendarState.weekIndex=0;
+          prepareCalendarState();
+          renderCalendarView();
+        }
+      });
+    }
+    const yearSelect=qs('#calendarYear');
+    if(yearSelect){
+      yearSelect.addEventListener('change',event=>{
+        const nextYear=parseInt(event.target.value,10);
+        if(!Number.isNaN(nextYear)){
+          calendarState.year=nextYear;
+          calendarState.weekIndex=0;
+          prepareCalendarState();
+          renderCalendarView();
+        }
+      });
+    }
+    const prevWeekBtn=qs('#calendarPrevWeek');
+    if(prevWeekBtn){
+      prevWeekBtn.addEventListener('click',()=>{
+        if(calendarState.weekIndex>0){
+          calendarState.weekIndex-=1;
+          renderCalendarView();
+        }
+      });
+    }
+    const nextWeekBtn=qs('#calendarNextWeek');
+    if(nextWeekBtn){
+      nextWeekBtn.addEventListener('click',()=>{
+        if(calendarState.weekIndex<calendarState.weeks.length-1){
+          calendarState.weekIndex+=1;
+          renderCalendarView();
+        }
+      });
+    }
+
+    const personalMode=qs('#personalMode');
+    if(personalMode){
+      personalMode.addEventListener('change',event=>{
+        const value=event.target.value;
+        personalState.mode=(value==='month')?'month':'week';
+        if(personalState.mode==='month'){ personalState.weekIndex=0; }
+        preparePersonalState();
+        renderPersonalView();
+      });
+    }
+    const personalEmployeeSelect=qs('#personalEmployeeSelect');
+    if(personalEmployeeSelect){
+      personalEmployeeSelect.addEventListener('change',event=>{
+        personalState.employee=event.target.value||null;
+        personalState.weekIndex=0;
+        preparePersonalState();
+        renderPersonalView();
+      });
+    }
+    const personalMonthSelect=qs('#personalMonth');
+    if(personalMonthSelect){
+      personalMonthSelect.addEventListener('change',event=>{
+        const nextMonth=parseInt(event.target.value,10);
+        if(!Number.isNaN(nextMonth)){
+          personalState.month=nextMonth;
+          personalState.weekIndex=0;
+          preparePersonalState();
+          renderPersonalView();
+        }
+      });
+    }
+    const personalYearSelect=qs('#personalYear');
+    if(personalYearSelect){
+      personalYearSelect.addEventListener('change',event=>{
+        const nextYear=parseInt(event.target.value,10);
+        if(!Number.isNaN(nextYear)){
+          personalState.year=nextYear;
+          personalState.weekIndex=0;
+          preparePersonalState();
+          renderPersonalView();
+        }
+      });
+    }
+    const personalPrevWeek=qs('#personalPrevWeek');
+    if(personalPrevWeek){
+      personalPrevWeek.addEventListener('click',()=>{
+        if(personalState.weekIndex>0){
+          personalState.weekIndex-=1;
+          renderPersonalView();
+        }
+      });
+    }
+    const personalNextWeek=qs('#personalNextWeek');
+    if(personalNextWeek){
+      personalNextWeek.addEventListener('click',()=>{
+        if(personalState.weekIndex<personalState.weeks.length-1){
+          personalState.weekIndex+=1;
+          renderPersonalView();
+        }
+      });
+    }
+
+    configurationRestored=loadConfigurationFromCookie();
+
+    document.addEventListener('input', queueAutoPersist);
+    document.addEventListener('change', queueAutoPersist);
+
+    if(!configurationRestored){
+      clearHolidayTable();
+      loadDefaultHolidaysForCountry().catch(()=>{});
+    }else{
+      syncPreferredOptionsToAllEmployees();
+      queueAutoPersist();
+    }
   }
 
-  export { initializeApp, addShift, removeShift, openEmployeeConfig, removeEmployee, addEmployee, addHolidayRow, loadDefaultHolidaysForCountry, clearHolidayTable, switchTab, closeEmployeeConfig, addUnavailRow, saveEmployeeConfig, closeDayDetail };
+  export { initializeApp, addShift, removeShift, openEmployeeConfig, removeEmployee, addEmployee, addHolidayRow, removeHolidayRow, loadDefaultHolidaysForCountry, clearHolidayTable, switchTab, closeEmployeeConfig, addUnavailRow, saveEmployeeConfig, closeDayDetail };

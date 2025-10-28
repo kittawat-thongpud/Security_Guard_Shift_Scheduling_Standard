@@ -289,10 +289,18 @@ export default function App() {
                 <tbody id="holidayTableBody" />
               </table>
               <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button className="btn btn-secondary" type="button" onClick={addHolidayRow}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => addHolidayRow()}
+                >
                   Add Holiday
                 </button>
-                <button className="btn btn-secondary" type="button" onClick={loadDefaultHolidaysForCountry}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => loadDefaultHolidaysForCountry().catch(() => {})}
+                >
                   Load Country Defaults
                 </button>
                 <button className="btn btn-danger" type="button" onClick={clearHolidayTable}>
@@ -370,11 +378,67 @@ export default function App() {
             <p>
               Period: <span id="schedulePeriodDisplay" />
             </p>
+            <div className="calendar-toolbar">
+              <div className="toolbar-group">
+                <label htmlFor="calendarMode">Window</label>
+                <select id="calendarMode" defaultValue="week">
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                </select>
+              </div>
+              <div className="toolbar-group">
+                <label htmlFor="calendarMonth">Month</label>
+                <select id="calendarMonth"></select>
+              </div>
+              <div className="toolbar-group">
+                <label htmlFor="calendarYear">Year</label>
+                <select id="calendarYear"></select>
+              </div>
+              <div className="toolbar-group week-controls" id="calendarWeekControls">
+                <button className="btn btn-secondary" type="button" id="calendarPrevWeek" aria-label="Previous week">
+                  &lt;
+                </button>
+                <span id="calendarWeekLabel">Week 1 / 1</span>
+                <button className="btn btn-secondary" type="button" id="calendarNextWeek" aria-label="Next week">
+                  &gt;
+                </button>
+              </div>
+            </div>
             <div className="calendar-view" id="siteCalendar" />
           </div>
           <div className="tab-content" id="personView">
             <h3>Personal Schedules</h3>
-            <div id="personSchedules" />
+            <div className="calendar-toolbar personal-toolbar">
+              <div className="toolbar-group">
+                <label htmlFor="personalEmployeeSelect">Employee</label>
+                <select id="personalEmployeeSelect"></select>
+              </div>
+              <div className="toolbar-group">
+                <label htmlFor="personalMode">Window</label>
+                <select id="personalMode" defaultValue="week">
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                </select>
+              </div>
+              <div className="toolbar-group">
+                <label htmlFor="personalMonth">Month</label>
+                <select id="personalMonth"></select>
+              </div>
+              <div className="toolbar-group">
+                <label htmlFor="personalYear">Year</label>
+                <select id="personalYear"></select>
+              </div>
+              <div className="toolbar-group week-controls" id="personalWeekControls">
+                <button className="btn btn-secondary" type="button" id="personalPrevWeek" aria-label="Previous week">
+                  &lt;
+                </button>
+                <span id="personalWeekLabel">Week 1 / 1</span>
+                <button className="btn btn-secondary" type="button" id="personalNextWeek" aria-label="Next week">
+                  &gt;
+                </button>
+              </div>
+            </div>
+            <div className="personal-calendar" id="personalCalendar" />
           </div>
           <div className="tab-content" id="constraintView">
             <h3>Constraint Analysis</h3>
@@ -490,6 +554,7 @@ export default function App() {
             </div>
             <div id="ganttRows" />
           </div>
+          <div id="dayAssignments" className="day-assignments" />
         </div>
       </div>
     </>
