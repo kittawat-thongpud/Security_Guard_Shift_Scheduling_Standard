@@ -22,6 +22,25 @@
     UK:{"2024-01-01":"New Year's Day","2024-04-01":"Easter Monday","2024-05-06":"Early May Bank Holiday","2024-12-25":"Christmas Day","2024-12-26":"Boxing Day"}
   };
 
+  const roleLabels={ guard:'Guard', supervisor:'Supervisor', senior:'Senior Guard' };
+  const roleTaskTemplates={
+    guard:[
+      'Perform perimeter patrol and access control checks.',
+      'Log incidents and radio updates every 2 hours.',
+      'Assist with visitor check-in during peak periods.'
+    ],
+    supervisor:[
+      'Review guard posts and shift coverage status.',
+      'Coordinate incident response and briefing notes.',
+      'Submit daily operations report before shift end.'
+    ],
+    senior:[
+      'Audit patrol routes and verify compliance.',
+      'Mentor on-duty guards and handle escalations.',
+      'Complete equipment readiness inspection.'
+    ]
+  };
+
   // ===== Shifts =====
   function getGlobalShiftNames(){return qsa('#shiftTableBody > tr').map(r=> (r.querySelector('td:nth-child(1) input')?.value||'').trim()).filter(Boolean);}  
   function updateEndTimeRow(row){ if(!row) return; const s=row.querySelector('.shift-start'); const z=row.querySelector('.shift-size'); const e=row.querySelector('.shift-end'); if(!(s&&z&&e)) return; const hrs=parseInt(z.value||'8',10); e.value=addHoursToTime(s.value||'00:00',hrs); }
@@ -83,24 +102,43 @@
   function removeEmployee(btn){
     const row=btn.closest('tr');
     const body=qs('#employeeTableBody');
-    if(body.children.length>1){ row.remove(); }
+    if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); }
     else{ alert('You need at least one employee.'); }
   }
 
   // ===== Holiday Register =====
   function addHolidayRow(dateStr='',nameStr=''){
+    const body=qs('#holidayTableBody'); if(!body) return;
+    const placeholder=body.querySelector('.holiday-empty'); if(placeholder) placeholder.remove();
     const tr=document.createElement('tr');
     tr.innerHTML=
       '<td><input type="date" value="'+dateStr+'" /></td>'+
       '<td><input type="text" placeholder="Holiday name" value="'+nameStr+'" /></td>'+
       '<td><button class="btn btn-danger" type="button" onclick="this.closest(\'tr\').remove()">Remove</button></td>';
-    qs('#holidayTableBody').appendChild(tr);
+    body.appendChild(tr);
   }  
   function clearHolidayTable(){ qs('#holidayTableBody').innerHTML=''; }
   function collectHolidaysFromTable(){ const map={}; qsa('#holidayTableBody tr').forEach(tr=>{ const d=tr.querySelector('input[type=date]')?.value||''; const n=tr.querySelector('input[type=text]')?.value?.trim()||''; if(d){ map[d]=n||'Holiday'; } }); return map; }
   function loadDefaultHolidaysForCountry(){
-    const c=qs('#country').value; const base=holidayCatalog[c]||{}; const s=qs('#startDate').value; const e=qs('#endDate').value; const existing=collectHolidaysFromTable();
-    Object.entries(base).forEach(([d,n])=>{ if(s&&e){ if(!(d>=s && d<=e)) return; } if(!(d in existing)) addHolidayRow(d,n); });
+    const body=qs('#holidayTableBody'); if(!body) return;
+    const c=qs('#country')?.value||'TH';
+    const base=holidayCatalog[c]||{}; const s=qs('#startDate')?.value||''; const e=qs('#endDate')?.value||''; const existing=collectHolidaysFromTable();
+    const hasRange=s&&e;
+    let added=0;
+    Object.entries(base).forEach(([d,n])=>{
+      const inRange=!hasRange || (d>=s && d<=e);
+      if(!inRange) return;
+      if(!(d in existing)){ addHolidayRow(d,n); added++; }
+    });
+    const placeholderExisting=body.querySelector('.holiday-empty');
+    if(added===0){
+      if(!placeholderExisting){
+        const row=document.createElement('tr');
+        row.className='holiday-empty';
+        row.innerHTML='<td colspan="3" class="muted">No public holidays within selected period.</td>';
+        body.appendChild(row);
+      }
+    }else if(placeholderExisting){ placeholderExisting.remove(); }
   }
   window.loadDefaultHolidaysForCountry = loadDefaultHolidaysForCountry; // ensure global for onclick
 
@@ -253,11 +291,19 @@
       dayEl.innerHTML=header;
       day.shifts.forEach(shift=>{
         const totalReq=Object.values(shift.requirements).reduce((a,b)=>a+b,0);
-        const totalAsg=Object.values(shift.assigned).flat().length;
+        const assignedByRole=Object.entries(shift.assigned);
+        const staffList=assignedByRole.flatMap(([role,names])=>names.map(name=>({ role, name })));
+        const totalAsg=staffList.length;
         const ok=totalAsg>=totalReq;
         const div=document.createElement('div');
         div.className='shift-slot '+(ok?'assigned':'unassigned');
-        div.innerHTML='<strong>'+shift.name+'</strong><br>'+shift.startTime+' - '+shift.endTime+'<br>Staff: '+totalAsg+'/'+totalReq;
+        let staffMarkup='';
+        if(staffList.length){
+          staffMarkup='<div class="chips shift-staff">'+staffList.map(({role,name})=>'<span class="chip role-'+role+'">'+name+'</span>').join('')+'</div>';
+        }else{
+          staffMarkup='<div class="muted shift-empty">No staff assigned</div>';
+        }
+        div.innerHTML='<strong>'+shift.name+'</strong><br>'+shift.startTime+' - '+shift.endTime+'<br>Staff: '+totalAsg+'/'+totalReq+staffMarkup;
         div.addEventListener('click', (e)=>{ e.stopPropagation(); openDayDetail(day.date); });
         dayEl.appendChild(div);
       });
@@ -365,15 +411,192 @@
     overlay.setAttribute('aria-hidden', 'true');
   }
 
-  function generatePersonalSchedules(){
-    const container=qs('#personSchedules'); container.innerHTML='<p class="muted">Personal schedule view would go here.</p>';
-  }
-  function generateConstraintAnalysis(){
-    const hours=qs('#hoursAnalysis'); hours.innerHTML='<p class="muted">Weekly hours analysis would go here.</p>';
-    const consecutive=qs('#consecutiveAnalysis'); consecutive.innerHTML='<p class="muted">Consecutive days analysis would go here.</p>';
+  function formatDisplayDate(dateStr){
+    const d=new Date(dateStr);
+    return d.toLocaleDateString(undefined,{ weekday:'short', month:'short', day:'numeric'});
   }
 
-  Object.assign(window,{
+  function generatePersonalSchedules(){
+    const container=qs('#personSchedules'); if(!container) return;
+    container.innerHTML='';
+
+    const roster={};
+    scheduleData.employees.forEach(emp=>{
+      roster[emp.name]={ ...emp, assignments:[] };
+    });
+
+    scheduleResults.schedule.forEach(day=>{
+      day.shifts.forEach(shift=>{
+        Object.entries(shift.assigned).forEach(([role,names])=>{
+          names.forEach(name=>{
+            if(!roster[name]){
+              roster[name]={ name, role, maxWeeklyHours:scheduleData.maxWeeklyHours, assignments:[] };
+            }
+            roster[name].assignments.push({
+              date:day.date,
+              shiftName:shift.name,
+              role,
+              startTime:shift.startTime,
+              endTime:shift.endTime
+            });
+          });
+        });
+      });
+    });
+
+    const people=Object.values(roster).filter(emp=>emp.name);
+    if(people.length===0){
+      container.innerHTML='<p class="muted">Add employees to view personal schedules.</p>';
+      return;
+    }
+
+    people.sort((a,b)=>a.name.localeCompare(b.name));
+
+    people.forEach(person=>{
+      const card=document.createElement('div');
+      card.className='person-card';
+
+      const header=document.createElement('div');
+      header.className='person-header';
+      header.innerHTML='<h3>'+person.name+'</h3><span class="role-badge role-'+person.role+'">'+(roleLabels[person.role]||person.role)+'</span>';
+
+      const body=document.createElement('div');
+      body.className='person-body';
+
+      if(person.assignments.length===0){
+        body.innerHTML='<p class="muted">No shifts assigned during this period.</p>';
+      }else{
+        const sortedAssignments=person.assignments.slice().sort((a,b)=>{
+          if(a.date===b.date){ return a.startTime.localeCompare(b.startTime); }
+          return a.date.localeCompare(b.date);
+        });
+
+        sortedAssignments.forEach(assignment=>{
+          const assignmentBlock=document.createElement('div');
+          assignmentBlock.className='assignment';
+          assignmentBlock.innerHTML='<div class="assignment-title"><strong>'+assignment.shiftName+'</strong><span>'+formatDisplayDate(assignment.date)+' • '+assignment.startTime+' - '+assignment.endTime+'</span></div>';
+
+          const taskList=document.createElement('ul');
+          taskList.className='task-list';
+          const baseTasks=roleTaskTemplates[assignment.role] || roleTaskTemplates.guard;
+          const shiftSpecificTasks=[
+            'Report to post before '+assignment.startTime+'.',
+            ...baseTasks,
+            'Complete handover at '+assignment.endTime+'.'
+          ];
+          shiftSpecificTasks.forEach(task=>{
+            const li=document.createElement('li');
+            li.textContent=task;
+            taskList.appendChild(li);
+          });
+
+          assignmentBlock.appendChild(taskList);
+          body.appendChild(assignmentBlock);
+        });
+      }
+
+      card.appendChild(header);
+      card.appendChild(body);
+      container.appendChild(card);
+    });
+  }
+
+  function analyzeConsecutiveDays(dates){
+    if(!dates || dates.length===0) return { longest:0, sequences:[], restGaps:[] };
+    const sorted=Array.from(new Set(dates)).sort();
+    let longest=1; let current=1;
+    const sequences=[];
+    const restGaps=[];
+    for(let i=1;i<sorted.length;i++){
+      const prev=new Date(sorted[i-1]);
+      const curr=new Date(sorted[i]);
+      const diffDays=Math.round((curr-prev)/86400000);
+      if(diffDays===1){
+        current+=1; longest=Math.max(longest,current);
+      }else{
+        sequences.push(current);
+        restGaps.push(diffDays-1);
+        current=1;
+      }
+    }
+    sequences.push(current);
+    return { longest:Math.max(longest,current), sequences, restGaps };
+  }
+
+  function generateConstraintAnalysis(){
+    const hours=qs('#hoursAnalysis');
+    const consecutive=qs('#consecutiveAnalysis');
+    if(!hours || !consecutive) return;
+
+    const employeeStats=new Map();
+    scheduleData.employees.forEach(emp=>{
+      employeeStats.set(emp.name,{ ...emp, totalMinutes:0, workingDates:[] });
+    });
+
+    scheduleResults.schedule.forEach(day=>{
+      day.shifts.forEach(shift=>{
+        const durationMins=Math.round(durationHours(shift.startTime,shift.endTime)*60);
+        Object.entries(shift.assigned).forEach(([role,names])=>{
+          names.forEach(name=>{
+            if(!employeeStats.has(name)){
+              employeeStats.set(name,{ name, role, maxWeeklyHours:scheduleData.maxWeeklyHours, totalMinutes:0, workingDates:[] });
+            }
+            const stat=employeeStats.get(name);
+            stat.role=role;
+            stat.totalMinutes+=durationMins;
+            stat.workingDates.push(day.date);
+          });
+        });
+      });
+    });
+
+    const totalDays=Math.max(1,scheduleResults.schedule.length);
+    const totalWeeks=Math.max(1, Math.ceil(totalDays/7));
+
+    const hoursRows=[];
+    const consecutiveRows=[];
+
+    employeeStats.forEach(stat=>{
+      const totalHours=(stat.totalMinutes/60).toFixed(1);
+      const allowedHours=((stat.maxWeeklyHours||scheduleData.maxWeeklyHours)*totalWeeks).toFixed(1);
+      const withinHours=parseFloat(totalHours)<=parseFloat(allowedHours);
+      hoursRows.push(
+        '<tr class="'+(withinHours?'':'warn-row')+'">'+
+          '<td>'+stat.name+'</td>'+ 
+          '<td>'+totalHours+'h</td>'+ 
+          '<td>'+allowedHours+'h</td>'+ 
+          '<td>'+(withinHours?'Within limit':'Exceeds limit')+'</td>'+ 
+        '</tr>'
+      );
+
+      const { longest, sequences, restGaps }=analyzeConsecutiveDays(stat.workingDates);
+      const overMax=sequences.some(len=>len>(scheduleData.maxConsecutiveDays||6));
+      const insufficientRest=restGaps.some(gap=>gap>0 && gap<(scheduleData.minDayOff||1));
+      consecutiveRows.push(
+        '<tr class="'+((overMax||insufficientRest)?'warn-row':'')+'">'+
+          '<td>'+stat.name+'</td>'+ 
+          '<td>'+longest+' days</td>'+ 
+          '<td>'+(scheduleData.maxConsecutiveDays||6)+' days</td>'+ 
+          '<td>'+(overMax?'Streak too long':'OK')+'</td>'+ 
+          '<td>'+(insufficientRest?'Rest under '+(scheduleData.minDayOff||1)+' day(s)':'OK')+'</td>'+ 
+        '</tr>'
+      );
+    });
+
+    hours.innerHTML=
+      '<table class="analysis-table">'+
+        '<thead><tr><th>Employee</th><th>Scheduled Hours</th><th>Allowed Hours</th><th>Status</th></tr></thead>'+ 
+        '<tbody>'+ (hoursRows.join('') || '<tr><td colspan="4" class="muted">No assignments scheduled.</td></tr>') +'</tbody>'+ 
+      '</table>';
+
+    consecutive.innerHTML=
+      '<table class="analysis-table">'+
+        '<thead><tr><th>Employee</th><th>Longest Streak</th><th>Max Allowed</th><th>Streak Status</th><th>Rest Compliance</th></tr></thead>'+ 
+        '<tbody>'+ (consecutiveRows.join('') || '<tr><td colspan="5" class="muted">No assignments scheduled.</td></tr>') +'</tbody>'+ 
+      '</table>';
+  }
+
+  const exposedHandlers={
     addShift,
     removeShift,
     openEmployeeConfig,
@@ -387,24 +610,52 @@
     addUnavailRow,
     saveEmployeeConfig,
     closeDayDetail
-  });
+  };
 
-  // ===== Initialize =====
-  document.addEventListener('DOMContentLoaded',()=>{
-    // Set default dates
-    const today=new Date(); const nextWeek=new Date(today.getTime()+7*86400000);
-    qs('#startDate').value=today.toISOString().split('T')[0];
-    qs('#endDate').value=nextWeek.toISOString().split('T')[0];
-    
-    // Attach event listeners
+  function exposeGlobalHandlers(){ if(typeof window!=='undefined'){ Object.assign(window,exposedHandlers); } }
+
+  exposeGlobalHandlers();
+
+  let initialized=false;
+  function initializeApp(){
+    exposeGlobalHandlers();
+    if(initialized) return;
+    initialized=true;
+
+    const startInput=qs('#startDate');
+    const endInput=qs('#endDate');
+    if(startInput && endInput){
+      const today=new Date(); const nextWeek=new Date(today.getTime()+7*86400000);
+      startInput.value=today.toISOString().split('T')[0];
+      endInput.value=nextWeek.toISOString().split('T')[0];
+    }
+
+    const countrySelect=qs('#country');
+    if(countrySelect){
+      countrySelect.addEventListener('change',()=>{
+        clearHolidayTable();
+        loadDefaultHolidaysForCountry();
+      });
+    }
+
     attachShiftDelegates();
-    qs('#startTest').addEventListener('click',generateSchedule);
-    
-    // Initialize end times for existing shifts
+    const trigger=qs('#startTest');
+    if(trigger){ trigger.addEventListener('click',generateSchedule); }
+
     qsa('#shiftTableBody > tr').forEach(updateEndTimeRow);
-    
-    // Test button
-    qs('#runTests').addEventListener('click',()=>{
-      qs('#testOutput').textContent='Tests passed: Shift end-time auto-calculation, Employee config panel, Day detail view with Gantt chart.';
-    });
-  });
+
+    const testsBtn=qs('#runTests');
+    if(testsBtn){
+      testsBtn.addEventListener('click',()=>{
+        const output=qs('#testOutput');
+        if(output){
+          output.textContent='Tests passed: Shift end-time auto-calculation, Employee config panel, Day detail view with Gantt chart.';
+        }
+      });
+    }
+
+    clearHolidayTable();
+    loadDefaultHolidaysForCountry();
+  }
+
+  export { initializeApp, addShift, removeShift, openEmployeeConfig, removeEmployee, addEmployee, addHolidayRow, loadDefaultHolidaysForCountry, clearHolidayTable, switchTab, closeEmployeeConfig, addUnavailRow, saveEmployeeConfig, closeDayDetail };
