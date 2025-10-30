@@ -773,7 +773,16 @@
   let currentDayDetailDate=null;
   let dayDetailEditState={ active:false, dayIndex:null, original:null, working:null, dirty:false };
   let configurationRestored=false;
-  function validateInputs(){ if(!qs('#startDate').value||!qs('#endDate').value) return false; const s=new Date(qs('#startDate').value), e=new Date(qs('#endDate').value); if(s>=e){ alert('End date must be after start date.'); return false;} if(qs('#shiftTableBody').children.length===0){ alert('Define at least one shift.'); return false;} if(qs('#employeeTableBody').children.length===0){ alert('Add at least one employee.'); return false;} return true; }
+  function validateInputs(){
+    if(!qs('#startDate').value||!qs('#endDate').value) return false;
+    const s=new Date(qs('#startDate').value), e=new Date(qs('#endDate').value);
+    if(s>=e){ alert('End date must be after start date.'); return false; }
+    const shiftRows=qsa('#shiftTableBody > tr');
+    const hasRegularShift=shiftRows.some(row=>!(row.dataset?.refillTemplate==='true' || (row.querySelector('td:nth-child(1) input')?.value||'').trim().toLowerCase()==='refill'));
+    if(!hasRegularShift){ alert('Define at least one regular shift pattern.'); return false; }
+    if(qs('#employeeTableBody').children.length===0){ alert('Add at least one employee.'); return false; }
+    return true;
+  }
   function generateSchedule(){
     scheduleData={ startDate:qs('#startDate').value, endDate:qs('#endDate').value, timezone:qs('#timezone').value, country:qs('#country').value, maxWeeklyHours:parseInt(qs('#maxWeeklyHours').value,10), maxConsecutiveDays:parseInt(qs('#maxConsecutiveDays').value,10), minDayOff:parseInt(qs('#minDayOff').value,10), holidays:collectHolidaysFromTable() };
     if(!validateInputs()){ alert('Fill required fields.'); return; }
@@ -784,7 +793,20 @@
       const size=parseInt(row.querySelector('.shift-size')?.value||'8',10);
       const end=addHoursToTime(start,size);
       const nums=row.querySelectorAll('input[type="number"]');
-      scheduleData.shifts.push({ name, startTime:start, endTime:end, requirements:{ guard:parseInt(nums[0]?.value||'0',10), supervisor:parseInt(nums[1]?.value||'0',10), senior:parseInt(nums[2]?.value||'0',10) } });
+      const isRefillTemplate=row.dataset?.refillTemplate==='true' || name.toLowerCase()==='refill';
+      scheduleData.shifts.push({
+        name,
+        startTime:start,
+        endTime:end,
+        size,
+        requirements:{
+          guard:parseInt(nums[0]?.value||'0',10),
+          supervisor:parseInt(nums[1]?.value||'0',10),
+          senior:parseInt(nums[2]?.value||'0',10)
+        },
+        isRefillTemplate,
+        locked: row.dataset?.locked==='true'
+      });
     });
     scheduleData.employees=[];
     qsa('#employeeTableBody > tr').forEach(row=>{
@@ -801,43 +823,178 @@
     const msPerDay=86400000;
     const daysDiff=Math.max(0, Math.floor((end-start)/msPerDay))+1;
     const schedule=[];
+    const employeeMinutes=new Map();
+    (scheduleData.employees||[]).forEach(emp=>{
+      if(emp?.name){ employeeMinutes.set(emp.name,0); }
+    });
+    const shiftTemplates=Array.isArray(scheduleData.shifts)?scheduleData.shifts:[];
+    const baseShiftTemplates=shiftTemplates.filter(sp=>!sp.isRefillTemplate);
+    const refillTemplate=shiftTemplates.find(sp=>sp.isRefillTemplate);
+    const defaultRefillDuration=refillTemplate?Math.round(durationHours(refillTemplate.startTime,refillTemplate.endTime)*60)||240:240;
+    const dayOffMap=scheduleData.dayOffMap || (scheduleData.dayOffMap={});
+
     let totalRequired=0,totalAssigned=0,roleRequirementsMet=0,totalRoleRequirements=0;
-    for(let i=0;i<daysDiff;i++){
-      const d=new Date(start.getTime()+i*msPerDay);
-      const dateStr=d.toISOString().split('T')[0]; const dayOfWeek=d.getDay();
-      const isWeekend=(dayOfWeek===0||dayOfWeek===6); const holidayName=scheduleData.holidays[dateStr]||'';
-      const daySchedule={date:dateStr,dayOfWeek,isWeekend,isHoliday:!!holidayName,holidayName,shifts:[]};
-      const dayShifts = scheduleData.shifts.map(sp=>({ name:sp.name, startTime:sp.startTime, endTime:sp.endTime, requirements:{...sp.requirements}, assigned:{guard:[],supervisor:[],senior:[]} }));
-      const roles=['guard','supervisor','senior'];
-      roles.forEach(role=>{
-        dayShifts.forEach(shift=>{
-          const req=shift.requirements[role]; totalRequired+=req; if(req>0) totalRoleRequirements++;
-          const already=new Set(Object.values(shift.assigned).flat());
-          const dayOffMap=scheduleData.dayOffMap || (scheduleData.dayOffMap={});
-          const pool = scheduleData.employees.filter(emp=> emp.role===role && !isEmployeePlannedOff(dayOffMap,emp.name,dateStr) && !emp.isSpare);
-          const avail = pool.filter(emp=>!already.has(emp.name));
-          let filled=0; const take=Math.min(req, avail.length);
-          for(let j=0;j<take;j++){ shift.assigned[role].push(avail[j].name); filled++; }
-          let need=req-filled;
-          if(need>0){
-            const sparePool=scheduleData.employees.filter(emp=> emp.role===role && !isEmployeePlannedOff(dayOffMap,emp.name,dateStr) && emp.isSpare);
-            const spareAvail=sparePool.filter(emp=>!already.has(emp.name));
-            const takeS=Math.min(need, spareAvail.length);
-            for(let k=0;k<takeS;k++){ shift.assigned[role].push(spareAvail[k].name); }
-            filled+=takeS; need-=takeS;
-          }
-          if(filled>=req) roleRequirementsMet++;
-          totalAssigned += filled;
-        });
+
+    const isEmployeeUnavailable=(emp,dateStr)=>{
+      if(!emp || !emp.name) return true;
+      if(Array.isArray(emp.unavailableDates) && emp.unavailableDates.includes(dateStr)) return true;
+      return isEmployeePlannedOff(dayOffMap,emp.name,dateStr);
+    };
+
+    function assignEmployeeToShift(shift, role, name, durationMinutes){
+      if(!shift.assigned[role]) shift.assigned[role]=[];
+      const already=shift.assigned[role];
+      if(already.includes(name)){
+        return false;
+      }
+      already.push(name);
+      const prev=employeeMinutes.get(name)||0;
+      employeeMinutes.set(name, prev + durationMinutes);
+      totalAssigned+=1;
+      return true;
+    }
+
+    const getCandidates=(role,dateStr,{ includeSpare=false, excludeNames=new Set() }={})=>{
+      return (scheduleData.employees||[]).filter(emp=>{
+        if(!emp || !emp.name) return false;
+        if(emp.role!==role) return false;
+        if(includeSpare){
+          if(!emp.isSpare) return false;
+        }else if(emp.isSpare){
+          return false;
+        }
+        if(excludeNames.has(emp.name)) return false;
+        if(isEmployeeUnavailable(emp,dateStr)) return false;
+        return true;
+      }).sort((a,b)=>{
+        const loadA=employeeMinutes.get(a.name)||0;
+        const loadB=employeeMinutes.get(b.name)||0;
+        if(loadA!==loadB) return loadA-loadB;
+        return a.name.localeCompare(b.name);
+      }).map(emp=>emp.name);
+    };
+
+    const getOrCreateRefillShift=(daySchedule, baseShift)=>{
+      const key=`${baseShift.name}|${baseShift.startTime}|${baseShift.endTime}`;
+      let shift=daySchedule.shifts.find(s=>s.isRefill && s.refillKey===key);
+      if(!shift){
+        shift={
+          name:`${(refillTemplate?.name)||'Refill'} - ${baseShift.name}`,
+          startTime:baseShift.startTime,
+          endTime:baseShift.endTime,
+          requirements:{ guard:0, supervisor:0, senior:0 },
+          assigned:{ guard:[], supervisor:[], senior:[] },
+          isRefill:true,
+          sourceName:baseShift.name,
+          refillKey:key
+        };
+        daySchedule.shifts.push(shift);
+      }
+      if(!shift.__durationMinutes){
+        const minutes=Math.round(durationHours(shift.startTime,shift.endTime)*60);
+        shift.__durationMinutes=minutes>0?minutes:defaultRefillDuration;
+      }
+      return shift;
+    };
+
+    const allocateRefill=(role, shortage, dateStr, daySchedule, baseShift)=>{
+      if(shortage<=0 || !refillTemplate) return shortage;
+      const refillShift=getOrCreateRefillShift(daySchedule, baseShift);
+      const duration=refillShift.__durationMinutes || defaultRefillDuration;
+      refillShift.requirements[role]=(refillShift.requirements[role]||0)+shortage;
+      totalRequired+=shortage;
+      totalRoleRequirements+=1;
+      let filled=0;
+      const existing=new Set(refillShift.assigned[role]||[]);
+      const primary=getCandidates(role,dateStr,{ includeSpare:false, excludeNames:existing });
+      primary.forEach(name=>{
+        if(filled>=shortage) return;
+        if(assignEmployeeToShift(refillShift, role, name, duration)){
+          existing.add(name);
+          filled++;
+        }
       });
-      if(isTripleEight(dayShifts)){
-        ['guard','supervisor','senior'].forEach(role=>{
-          const shortage = dayShifts.reduce((a,s)=>a + Math.max(0,s.requirements[role]-s.assigned[role].length),0);
-          if(shortage>0){ upgradeFirstLayer12x2(dayShifts, role, dateStr); }
+      if(filled<shortage){
+        const spare=getCandidates(role,dateStr,{ includeSpare:true, excludeNames:existing });
+        spare.forEach(name=>{
+          if(filled>=shortage) return;
+          if(assignEmployeeToShift(refillShift, role, name, duration)){
+            existing.add(name);
+            filled++;
+          }
         });
       }
-      daySchedule.shifts = dayShifts; schedule.push(daySchedule);
+      if(filled>=shortage){
+        roleRequirementsMet+=1;
+      }else{
+        console.warn('[Scheduler] Unable to fully cover refill requirement', { date:dateStr, role, shortage, filled });
+      }
+      return shortage-filled;
+    };
+
+    for(let i=0;i<daysDiff;i++){
+      const d=new Date(start.getTime()+i*msPerDay);
+      const dateStr=d.toISOString().split('T')[0];
+      const dayOfWeek=d.getDay();
+      const isWeekend=(dayOfWeek===0||dayOfWeek===6);
+      const holidayName=scheduleData.holidays[dateStr]||'';
+    const dayShifts=baseShiftTemplates.map(sp=>({
+      name:sp.name,
+      startTime:sp.startTime,
+      endTime:sp.endTime,
+      requirements:{ guard:sp.requirements?.guard||0, supervisor:sp.requirements?.supervisor||0, senior:sp.requirements?.senior||0 },
+      assigned:{ guard:[], supervisor:[], senior:[] },
+      isRefill:false,
+      sourceName:sp.name,
+      __durationMinutes: Math.round(durationHours(sp.startTime,sp.endTime)*60) || (sp.size?sp.size*60:480)
+    }));
+    dayShifts.sort((a,b)=>{
+      const startA=timeToMinutes(a.startTime);
+      const startB=timeToMinutes(b.startTime);
+      if(startA!==startB) return startA-startB;
+      return a.name.localeCompare(b.name);
+    });
+    const daySchedule={ date:dateStr, dayOfWeek, isWeekend, isHoliday:!!holidayName, holidayName, shifts:dayShifts };
+
+      dayShifts.forEach(shift=>{
+        const duration=shift.__durationMinutes || Math.round(durationHours(shift.startTime,shift.endTime)*60) || 480;
+        ['guard','supervisor','senior'].forEach(role=>{
+          const req=parseInt(shift.requirements[role]||0,10);
+          if(req<=0) return;
+          totalRequired+=req;
+          totalRoleRequirements+=1;
+          const assignedSet=new Set(Object.values(shift.assigned).flat());
+          let filled=0;
+          const candidates=getCandidates(role,dateStr,{ includeSpare:false, excludeNames:assignedSet });
+          for(const name of candidates){
+            if(filled>=req) break;
+            if(assignEmployeeToShift(shift, role, name, duration)){
+              assignedSet.add(name);
+              filled++;
+            }
+          }
+          if(filled<req){
+            const spareCandidates=getCandidates(role,dateStr,{ includeSpare:true, excludeNames:assignedSet });
+            for(const name of spareCandidates){
+              if(filled>=req) break;
+              if(assignEmployeeToShift(shift, role, name, duration)){
+                assignedSet.add(name);
+                filled++;
+              }
+            }
+          }
+          if(filled>=req){
+            roleRequirementsMet+=1;
+          }else{
+            const remaining=req-filled;
+            allocateRefill(role, remaining, dateStr, daySchedule, shift);
+          }
+        });
+      });
+
+      schedule.push(daySchedule);
     }
+
     const coverageRate=totalRequired>0?Math.round((totalAssigned/totalRequired)*100):0;
     const roleCompliance=totalRoleRequirements>0?Math.round((roleRequirementsMet/totalRoleRequirements)*100):0;
     scheduleResults={ schedule, metrics:{ coverageRate, roleCompliance, constraintCompliance:92+Math.floor(Math.random()*6), processingTime:400+Math.floor(Math.random()*400) } };
@@ -1027,6 +1184,9 @@
   function createShiftSummary(shift){
     const wrapper=document.createElement('div');
     wrapper.className='shift-summary';
+    if(shift.isRefill){
+      wrapper.classList.add('shift-summary-refill');
+    }
 
     const header=document.createElement('div');
     header.className='shift-summary-header';
@@ -2431,6 +2591,7 @@
     }
 
     attachShiftDelegates();
+    ensureRefillShiftPresence();
     const trigger=qs('#startTest');
     if(trigger){ trigger.addEventListener('click',generateSchedule); }
 
