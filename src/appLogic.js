@@ -39,7 +39,11 @@
   const monthNamesFull=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   const HOLIDAY_API_ENDPOINT='https://date.nager.at/api/v3/PublicHolidays';
+  const OPEN_HOLIDAY_ENDPOINT='https://openholidaysapi.org/PublicHolidays';
+  const MYHORA_HOLIDAYS_URL='https://www.myhora.com/calendar/ical/holiday.aspx?latest.json';
   const holidayCache=new Map();
+  const openHolidayCache=new Map();
+  const myHoraCache=new Map();
   let holidayFetchToken=0;
 
   const CONFIG_COOKIE_NAME='sgss_config_v1';
@@ -178,6 +182,98 @@
     }
   }
 
+  function sanitizeHolidayText(value){
+    if(typeof value!=='string') return value || '';
+    return value.replace(/^"+|"+$/g,'').trim();
+  }
+
+  async function fetchOpenHolidayRange(country,startValue,endValue){
+    const code=(country||'').toUpperCase();
+    const key=`${code}-${startValue}-${endValue}`;
+    if(openHolidayCache.has(key)){ return openHolidayCache.get(key); }
+    const url=`${OPEN_HOLIDAY_ENDPOINT}?countryIsoCode=${encodeURIComponent(code)}&languageIsoCode=en&validFrom=${encodeURIComponent(startValue)}&validTo=${encodeURIComponent(endValue)}`;
+    const pending=fetch(url).then(async res=>{
+      if(!res.ok){ throw new Error(`Failed to load OpenHolidays data for ${code}: ${res.status}`); }
+      const data=await res.json();
+      if(!Array.isArray(data)) return [];
+      return data.map(entry=>{
+        const rawDate=entry.startDate || entry.date || entry.start || '';
+        const isoDate=rawDate ? rawDate.split('T')[0] : '';
+        let name='';
+        if(Array.isArray(entry.name)){
+          name=entry.name.find(item=>item.language==='EN')?.text || entry.name[0]?.text || entry.name[0]?.value || '';
+        }else if(entry.name && typeof entry.name==='object'){
+          name=entry.name.text || entry.name.value || '';
+        }else if(typeof entry.name==='string'){
+          name=entry.name;
+        }else if(Array.isArray(entry.names)){
+          name=entry.names.find(item=>item.language==='EN')?.text || entry.names[0]?.text || entry.names[0]?.value || '';
+        }
+        if(!name && Array.isArray(entry.translations)){
+          name=entry.translations.find(item=>item.language==='EN')?.text || entry.translations[0]?.text || '';
+        }
+        if(!name){
+          name=entry.description || 'Holiday';
+        }
+        return { date: isoDate, name: sanitizeHolidayText(name) };
+      }).filter(item=> item.date && item.date>=startValue && item.date<=endValue);
+    });
+    openHolidayCache.set(key, pending);
+    try{
+      return await pending;
+    }catch(err){
+      openHolidayCache.delete(key);
+      throw err;
+    }
+  }
+
+  async function fetchMyHoraHolidays(country,startValue,endValue){
+    const code=(country||'').toUpperCase();
+    if(code!=='TH') return [];
+    const key=`TH-${startValue}-${endValue}`;
+    if(myHoraCache.has(key)){ return myHoraCache.get(key); }
+    const pending=(async ()=>{
+      try{
+        const remoteResponse=await fetch(MYHORA_HOLIDAYS_URL,{ mode:'cors' });
+        if(remoteResponse.ok){
+          const data=await remoteResponse.json();
+          const vevents=data?.VCALENDAR?.VEVENT;
+          if(vevents && typeof vevents==='object'){
+            const events=Object.values(vevents).map(event=>{
+              const rawDate=sanitizeHolidayText(event['DTSTART;VALUE=DATE'] || event.DTSTART || '');
+              const isoDate=rawDate && rawDate.length===8 ? `${rawDate.slice(0,4)}-${rawDate.slice(4,6)}-${rawDate.slice(6,8)}` : '';
+              const summary=sanitizeHolidayText(event.SUMMARY || '');
+              return { date: isoDate, name: summary || 'Holiday' };
+            }).filter(item=> item.date && item.date>=startValue && item.date<=endValue);
+            if(events.length){
+              return events;
+            }
+          }
+        }else{
+          console.warn('[HolidayLoader] MyHora remote dataset returned status', remoteResponse.status);
+        }
+      }catch(err){
+        console.warn('[HolidayLoader] MyHora remote dataset unavailable', err);
+      }
+      try{
+        const localRes=await fetch('/holidays/th.json');
+        if(!localRes.ok){ throw new Error(`Local MyHora cache missing: ${localRes.status}`); }
+        const localData=await localRes.json();
+        return (Array.isArray(localData)?localData:[]).filter(item=> item.date>=startValue && item.date<=endValue);
+      }catch(localErr){
+        console.error('[HolidayLoader] Local MyHora cache failed', localErr);
+        return [];
+      }
+    })();
+    myHoraCache.set(key, pending);
+    try{
+      return await pending;
+    }catch(err){
+      myHoraCache.delete(key);
+      throw err;
+    }
+  }
+
   function removeHolidayPlaceholders(body){
     qsa('.holiday-empty', body || document).forEach(el=>el.remove());
   }
@@ -199,7 +295,12 @@
   }
 
   // ===== Shifts =====
-  function getGlobalShiftNames(){return qsa('#shiftTableBody > tr').map(r=> (r.querySelector('td:nth-child(1) input')?.value||'').trim()).filter(Boolean);}  
+  function getGlobalShiftNames(){
+    return qsa('#shiftTableBody > tr').filter(row=>{
+      const name=row.querySelector('td:nth-child(1) input')?.value||'';
+      return !(row.dataset?.refillTemplate==='true' || name.trim().toLowerCase()==='refill');
+    }).map(r=> (r.querySelector('td:nth-child(1) input')?.value||'').trim()).filter(Boolean);
+  }
   function updateEndTimeRow(row){ if(!row) return; const s=row.querySelector('.shift-start'); const z=row.querySelector('.shift-size'); const e=row.querySelector('.shift-end'); if(!(s&&z&&e)) return; const hrs=parseInt(z.value||'8',10); e.value=addHoursToTime(s.value||'00:00',hrs); }
 
   function addShift(shiftData={}){
@@ -213,6 +314,8 @@
     const reqGuard=requirements.guard ?? shiftData.guard ?? 1;
     const reqSupervisor=requirements.supervisor ?? shiftData.supervisor ?? 0;
     const reqSenior=requirements.senior ?? shiftData.senior ?? 0;
+    const locked=!!shiftData.locked;
+    const isRefillTemplate=!!shiftData.isRefillTemplate || name.trim().toLowerCase()==='refill';
     tr.innerHTML=
       '<td><input type="text" placeholder="Shift name" value="'+name+'" /></td>'+
       '<td><input type="time" value="'+start+'" class="shift-start" /></td>'+
@@ -226,14 +329,91 @@
       '<td><input type="number" value="'+reqSenior+'" min="0" /></td>'+
       '<td><button class="btn btn-secondary" onclick="removeShift(this)">Remove</button></td>';
     tbody.appendChild(tr);
+    if(isRefillTemplate){
+      tr.dataset.refillTemplate='true';
+    }
+    if(locked || isRefillTemplate){
+      tr.dataset.locked='true';
+      tr.classList.add('shift-row-locked');
+      const nameInput=tr.querySelector('td:nth-child(1) input');
+      const startInput=tr.querySelector('.shift-start');
+      const sizeSelect=tr.querySelector('.shift-size');
+      const endInput=tr.querySelector('.shift-end');
+      const numberInputs=tr.querySelectorAll('input[type="number"]');
+      const removeBtn=tr.querySelector('button');
+      [nameInput,startInput,endInput].forEach(input=>{
+        if(input){
+          input.readOnly=true;
+          input.classList.add('locked-input');
+        }
+      });
+      if(sizeSelect){
+        sizeSelect.disabled=true;
+        sizeSelect.classList.add('locked-input');
+      }
+      numberInputs.forEach(input=>{
+        input.readOnly=true;
+        input.classList.add('locked-input');
+      });
+      if(removeBtn){
+        removeBtn.disabled=true;
+        removeBtn.textContent='Locked';
+        removeBtn.classList.add('btn-locked');
+      }
+    }
     updateEndTimeRow(tr); // ensure end time correct on insert
     if(!isApplyingConfiguration) queueAutoPersist();
   }
   function removeShift(btn){
     const row=btn.closest('tr');
+    if(row && row.dataset && row.dataset.locked==='true'){
+      alert('This shift is locked and cannot be removed.');
+      return;
+    }
     const body=qs('#shiftTableBody');
     if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); if(!isApplyingConfiguration) queueAutoPersist(); }
     else{ alert('You need at least one shift pattern.'); }
+  }
+
+  function ensureRefillShiftPresence(){
+    const tbody=qs('#shiftTableBody');
+    if(!tbody) return;
+    const rows=qsa(':scope > tr', tbody);
+    const existing=rows.find(row=>{
+      const name=row.querySelector('td:nth-child(1) input')?.value||'';
+      return row.dataset?.refillTemplate==='true' || name.trim().toLowerCase()==='refill';
+    });
+    if(existing){
+      existing.dataset.refillTemplate='true';
+      existing.dataset.locked='true';
+      existing.classList.add('shift-row-locked');
+      const inputs=existing.querySelectorAll('input, select, button');
+      inputs.forEach(el=>{
+        if(el.tagName==='BUTTON'){
+          el.disabled=true;
+          el.textContent='Locked';
+          el.classList.add('btn-locked');
+        }else if(el.tagName==='SELECT'){
+          el.disabled=true;
+          el.classList.add('locked-input');
+        }else if(el instanceof HTMLInputElement){
+          if(el.type!=='hidden'){
+            el.readOnly=true;
+            el.classList.add('locked-input');
+          }
+        }
+      });
+      return;
+    }
+    addShift({
+      name:'Refill',
+      startTime:'00:00',
+      size:4,
+      endTime:addHoursToTime('00:00',4),
+      requirements:{ guard:1, supervisor:0, senior:0 },
+      locked:true,
+      isRefillTemplate:true
+    });
   }
 
   // Robust delegated listeners: handle input and change from both time and select controls
@@ -364,7 +544,6 @@
       const filtered=combined.filter(item=> item.date>=startValue && item.date<=endValue);
       const uniqueByDate=new Map();
       filtered.forEach(item=>{ uniqueByDate.set(item.date, item.name); });
-      const availableDates=new Set(uniqueByDate.keys());
 
       console.log('[HolidayLoader] Holiday results', {
         fetched: combined.length,
@@ -373,13 +552,33 @@
       });
 
       if(uniqueByDate.size===0){
-        const fallbackEntries=getFallbackHolidays(country, years).filter(item=> item.date>=startValue && item.date<=endValue);
-        if(fallbackEntries.length){
-          fallbackEntries.forEach(item=> uniqueByDate.set(item.date,item.name));
-          console.log('[HolidayLoader] Using fallback holiday dataset', { fallbackCount:fallbackEntries.length });
-          fallbackEntries.forEach(entry=> availableDates.add(entry.date));
+        console.warn('[HolidayLoader] No holidays fall inside the selected period. First few API results:', combined.slice(0,5));
+        let loaded=false;
+        try{
+          const myHoraFallback=await fetchMyHoraHolidays(country, startValue, endValue);
+          if(myHoraFallback.length){
+            myHoraFallback.forEach(item=> uniqueByDate.set(item.date,item.name));
+            loaded=true;
+            console.info('[HolidayLoader] Populated holidays from MyHora fallback', { fallbackCount:myHoraFallback.length });
+          }
+        }catch(fallbackErr){
+          console.error('[HolidayLoader] MyHora fallback failed', fallbackErr);
+        }
+        if(!loaded){
+          try{
+            const openFallback=await fetchOpenHolidayRange(country, startValue, endValue);
+            if(openFallback.length){
+              openFallback.forEach(item=> uniqueByDate.set(item.date,item.name));
+              loaded=true;
+              console.info('[HolidayLoader] Populated holidays from OpenHolidays fallback', { fallbackCount:openFallback.length });
+            }
+          }catch(fallbackErr){
+            console.error('[HolidayLoader] OpenHolidays fallback failed', fallbackErr);
+          }
         }
       }
+
+      const availableDates=new Set(uniqueByDate.keys());
 
       qsa('#holidayTableBody tr').forEach(tr=>{
         if(tr===loadingRow) return;
@@ -410,12 +609,46 @@
     }catch(error){
       if(token!==holidayFetchToken) return;
       if(loadingRow && loadingRow.isConnected){ loadingRow.remove(); }
+      console.error('[HolidayLoader] Failed to load holidays', error);
+      try{
+        let loaded=false;
+        let fallbackEntries=[];
+        try{
+          fallbackEntries=await fetchMyHoraHolidays(country, startValue, endValue);
+          if(Array.isArray(fallbackEntries) && fallbackEntries.length){
+            loaded=true;
+            console.warn('[HolidayLoader] Primary API unavailable; loaded MyHora fallback', { fallbackCount:fallbackEntries.length });
+          }
+        }catch(myHoraErr){
+          console.error('[HolidayLoader] MyHora fallback failed during error handling', myHoraErr);
+        }
+        if(!loaded){
+          try{
+            fallbackEntries=await fetchOpenHolidayRange(country, startValue, endValue);
+            if(Array.isArray(fallbackEntries) && fallbackEntries.length){
+              loaded=true;
+              console.warn('[HolidayLoader] Primary API unavailable; loaded OpenHolidays fallback', { fallbackCount:fallbackEntries.length });
+            }
+          }catch(openErr){
+            console.error('[HolidayLoader] OpenHolidays fallback failed during error handling', openErr);
+          }
+        }
+        if(loaded && fallbackEntries.length){
+          removeDefaultHolidayRows(body);
+          fallbackEntries.forEach(entry=> addHolidayRow(entry.date, entry.name, 'default'));
+          removeHolidayPlaceholders(body);
+          alert('Primary holiday service is unavailable. Holidays have been loaded from an alternate source.');
+          if(!isApplyingConfiguration) queueAutoPersist();
+          return;
+        }
+      }catch(fallbackError){
+        console.error('[HolidayLoader] Fallback loading failed during error handling', fallbackError);
+      }
       removeDefaultHolidayRows(body);
       if(!body.querySelector('tr')){
         ensureHolidayPlaceholder(body,'Unable to load public holidays. Please try again later.','holiday-error');
       }
-      console.error('[HolidayLoader] Failed to load holidays', error);
-      console.error('Failed to load public holidays', error);
+      alert('Unable to load public holidays from any online source. Please try again later.');
       if(!isApplyingConfiguration) queueAutoPersist();
     }
   }
@@ -538,6 +771,7 @@
   let personalRoster=[];
   let personalState={ employee:null, mode:'week', month:null, year:null, weekIndex:0, weeks:[], availableMonths:[] };
   let currentDayDetailDate=null;
+  let dayDetailEditState={ active:false, dayIndex:null, original:null, working:null, dirty:false };
   let configurationRestored=false;
   function validateInputs(){ if(!qs('#startDate').value||!qs('#endDate').value) return false; const s=new Date(qs('#startDate').value), e=new Date(qs('#endDate').value); if(s>=e){ alert('End date must be after start date.'); return false;} if(qs('#shiftTableBody').children.length===0){ alert('Define at least one shift.'); return false;} if(qs('#employeeTableBody').children.length===0){ alert('Add at least one employee.'); return false;} return true; }
   function generateSchedule(){
@@ -813,6 +1047,15 @@
     const metric=document.createElement('div');
     metric.className='shift-summary-metric';
     metric.textContent=`Staff ${totalAsg}/${totalReq}`;
+    if(totalReq>0){
+      if(totalAsg<totalReq){
+        metric.classList.add('under');
+      }else if(totalAsg===totalReq){
+        metric.classList.add('met');
+      }else{
+        metric.classList.add('exceed');
+      }
+    }
     wrapper.appendChild(metric);
 
     if(staffList.length){
@@ -911,7 +1154,9 @@
     }
     card.appendChild(body);
 
-    if(day.dayData){
+    const shouldOpenDetail = day.inMonth && (day.dayData || (scheduleResults?.schedule?.length>0));
+    if(shouldOpenDetail){
+      card.classList.add('interactive');
       card.addEventListener('click',()=> openDayDetail(day.dateISO));
     }
 
@@ -1199,19 +1444,55 @@
     return (scheduleData.employees||[]).filter(emp=>emp.role===role).map(emp=>emp.name);
   }
 
-  function renderDayGantt(day){
+  function renderDayGantt(day, dayIndex){
     const ganttRows = qs('#ganttRows');
     if(!ganttRows) return;
     ganttRows.innerHTML='';
 
-    const employeeAssignments={};
-    day.shifts.forEach(shift=>{
+    const totalMinutes=24*60;
+    const employeeAssignments=new Map();
+
+    function ensureEmployee(name){
+      if(!employeeAssignments.has(name)){
+        employeeAssignments.set(name,[]);
+      }
+      return employeeAssignments.get(name);
+    }
+
+    function pushAssignment({ employeeName, role, shiftName, startTime, endTime, overrideStartMinutes, overrideEndMinutes, fromPreviousDay=false }){
+      if(!employeeName) return;
+      const list=ensureEmployee(employeeName);
+      let startMinutes = typeof overrideStartMinutes==='number' ? overrideStartMinutes : timeToMinutes(startTime);
+      let endMinutes = typeof overrideEndMinutes==='number' ? overrideEndMinutes : timeToMinutes(endTime);
+      let crossesMidnight=false;
+      if(!fromPreviousDay && endMinutes<=startMinutes){
+        endMinutes+=totalMinutes;
+        crossesMidnight=true;
+      }
+      if(fromPreviousDay){
+        if(typeof overrideStartMinutes!=='number'){ startMinutes=0; }
+        if(typeof overrideEndMinutes!=='number'){ endMinutes=timeToMinutes(endTime); }
+        crossesMidnight=false;
+      }
+      list.push({
+        shiftName,
+        role,
+        displayStart:startTime,
+        displayEnd:endTime,
+        startMinutes,
+        endMinutes,
+        fromPreviousDay,
+        crossesMidnight: crossesMidnight || endMinutes>totalMinutes
+      });
+    }
+
+    (day.shifts||[]).forEach(shift=>{
       Object.entries(shift.assigned||{}).forEach(([role, employees])=>{
         (employees||[]).forEach(empName=>{
-          if(!employeeAssignments[empName]){ employeeAssignments[empName]=[]; }
-          employeeAssignments[empName].push({
-            shiftName:shift.name,
+          pushAssignment({
+            employeeName:empName,
             role,
+            shiftName:shift.name,
             startTime:shift.startTime,
             endTime:shift.endTime
           });
@@ -1219,8 +1500,35 @@
       });
     });
 
-    const entries=Object.entries(employeeAssignments);
-    if(!entries.length){
+    if(typeof dayIndex==='number' && dayIndex>0 && Array.isArray(scheduleResults?.schedule)){
+      const prevDay = scheduleResults.schedule[dayIndex-1];
+      if(prevDay && Array.isArray(prevDay.shifts)){
+        prevDay.shifts.forEach(prevShift=>{
+          const startMinutes=timeToMinutes(prevShift.startTime);
+          const endMinutes=timeToMinutes(prevShift.endTime);
+          if(endMinutes<=startMinutes){
+            Object.entries(prevShift.assigned||{}).forEach(([role, employees])=>{
+              (employees||[]).forEach(empName=>{
+                pushAssignment({
+                  employeeName:empName,
+                  role,
+                  shiftName:prevShift.name,
+                  startTime:prevShift.startTime,
+                  endTime:prevShift.endTime,
+                  overrideStartMinutes:0,
+                  overrideEndMinutes:endMinutes,
+                  fromPreviousDay:true
+                });
+              });
+            });
+          }
+        });
+      }
+    }
+
+    const sortedEntries=[...employeeAssignments.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+
+    if(!sortedEntries.length){
       const empty=document.createElement('div');
       empty.className='muted';
       empty.textContent='No assignments for this day.';
@@ -1228,7 +1536,8 @@
       return;
     }
 
-    entries.forEach(([empName, assignments])=>{
+    sortedEntries.forEach(([empName, assignments])=>{
+      assignments.sort((a,b)=>a.startMinutes-b.startMinutes);
       const row=document.createElement('div');
       row.className='gantt-row';
 
@@ -1241,16 +1550,21 @@
       track.className='gantt-track';
 
       assignments.forEach(assignment=>{
+        const effectiveEnd=Math.min(assignment.endMinutes, totalMinutes);
+        if(effectiveEnd<=assignment.startMinutes){
+          return;
+        }
         const bar=document.createElement('div');
         bar.className=`gantt-bar role-${assignment.role}-bar`;
-        const startMinutes=timeToMinutes(assignment.startTime);
-        let endMinutes=timeToMinutes(assignment.endTime);
-        if(endMinutes < startMinutes){ endMinutes += 24*60; }
-        const left=(startMinutes/(24*60))*100;
-        const width=((endMinutes-startMinutes)/(24*60))*100;
-        bar.style.left=`${left}%`;
-        bar.style.width=`${width}%`;
-        bar.textContent=`${assignment.shiftName} (${assignment.startTime}-${assignment.endTime})`;
+        const start=assignment.startMinutes;
+        const leftPercent=Math.max(0, Math.min(100, (start/totalMinutes)*100));
+        const widthPercent=Math.max(0, ((effectiveEnd-start)/totalMinutes)*100);
+        bar.style.left=`${leftPercent}%`;
+        bar.style.width=`${Math.min(100-leftPercent, widthPercent)}%`;
+        if(assignment.endMinutes>totalMinutes){
+          bar.dataset.continues='true';
+        }
+        bar.textContent=`${assignment.shiftName} (${assignment.displayStart}-${assignment.displayEnd})`;
         track.appendChild(bar);
       });
 
@@ -1275,7 +1589,29 @@
 
       const head=document.createElement('div');
       head.className='assignment-editor-head';
-      head.innerHTML=`<h3>${shift.name}</h3><span>${shift.startTime} - ${shift.endTime}</span>`;
+      const headInfo=document.createElement('div');
+      headInfo.className='assignment-head-info';
+      const title=document.createElement('h3');
+      title.textContent=shift.name;
+      const time=document.createElement('span');
+      time.textContent=`${shift.startTime} - ${shift.endTime}`;
+      headInfo.appendChild(title);
+      headInfo.appendChild(time);
+      head.appendChild(headInfo);
+
+      if(dayDetailEditState.active && dayDetailEditState.dayIndex===dayIndex){
+        const headActions=document.createElement('div');
+        headActions.className='assignment-head-actions';
+        const removeShiftBtn=document.createElement('button');
+        removeShiftBtn.type='button';
+        removeShiftBtn.className='btn btn-secondary btn-compact';
+        removeShiftBtn.textContent='Remove';
+        removeShiftBtn.addEventListener('click',()=>{
+          removeShiftFromDay(dayIndex, shiftIndex);
+        });
+        headActions.appendChild(removeShiftBtn);
+        head.appendChild(headActions);
+      }
       card.appendChild(head);
 
       const roleKeys=new Set([...Object.keys(shift.requirements||{}), ...Object.keys(shift.assigned||{})]);
@@ -1316,31 +1652,51 @@
 
         const addWrapper=document.createElement('div');
         addWrapper.className='assignment-add';
-        const select=document.createElement('select');
-        const placeholder=document.createElement('option');
-        placeholder.value='';
-        placeholder.textContent=`Add ${roleLabels[role]||role}`;
-        select.appendChild(placeholder);
         const existing=new Set((shift.assigned?.[role]||[]));
-        getEmployeesForRole(role).forEach(name=>{
-          if(existing.has(name)) return;
-          const option=document.createElement('option');
-          option.value=name;
-          option.textContent=name;
-          select.appendChild(option);
-        });
-        select.addEventListener('change',event=>{
-          const value=event.target.value;
-          if(value){
-            addAssignmentToShift(dayIndex, shiftIndex, role, value);
-            event.target.value='';
-          }
-        });
-        addWrapper.appendChild(select);
-        if(select.options.length===1){
-          select.disabled=true;
+        const availableEmployees=getEmployeesForRole(role).filter(name=>!existing.has(name));
+        const addBtn=document.createElement('button');
+        addBtn.type='button';
+        addBtn.className='btn btn-secondary btn-compact assignment-add-trigger';
+        addBtn.textContent='Add';
+        addWrapper.appendChild(addBtn);
+
+        if(availableEmployees.length){
+          const select=document.createElement('select');
+          select.className='assignment-add-menu';
+          select.hidden=true;
+          const placeholder=document.createElement('option');
+          placeholder.value='';
+          placeholder.textContent=`Select ${roleLabels[role]||role}`;
+          select.appendChild(placeholder);
+          availableEmployees.forEach(name=>{
+            const option=document.createElement('option');
+            option.value=name;
+            option.textContent=name;
+            select.appendChild(option);
+          });
+          addWrapper.appendChild(select);
+          addBtn.addEventListener('click',()=>{
+            select.hidden=!select.hidden;
+            if(!select.hidden){
+              select.focus();
+            }
+          });
+          select.addEventListener('change',event=>{
+            const value=event.target.value;
+            if(value){
+              addAssignmentToShift(dayIndex, shiftIndex, role, value);
+              event.target.value='';
+              select.hidden=true;
+            }
+          });
+          select.addEventListener('blur',()=>{
+            select.hidden=true;
+            select.value='';
+          });
+        }else{
+          addBtn.disabled=true;
           const noOptions=document.createElement('span');
-          noOptions.className='muted';
+          noOptions.className='muted assignment-add-empty';
           noOptions.textContent='No available employees';
           addWrapper.appendChild(noOptions);
         }
@@ -1353,27 +1709,71 @@
     });
   }
 
+  function addShiftToDayFromTemplate(templateIndex){
+    if(!dayDetailEditState.active) return;
+    const dayIndex=dayDetailEditState.dayIndex;
+    const templates=scheduleData?.shifts || [];
+    const template=templates[templateIndex];
+    if(!template) return;
+    const newShift={
+      name:template.name,
+      startTime:template.startTime,
+      endTime:template.endTime,
+      requirements:{
+        guard:template.requirements?.guard ?? 0,
+        supervisor:template.requirements?.supervisor ?? 0,
+        senior:template.requirements?.senior ?? 0
+      },
+      assigned:{ guard:[], supervisor:[], senior:[] }
+    };
+    dayDetailEditState.working.shifts = Array.isArray(dayDetailEditState.working.shifts) ? dayDetailEditState.working.shifts : [];
+    dayDetailEditState.working.shifts.push(newShift);
+    sortShiftsByStart(dayDetailEditState.working.shifts);
+    markDayDetailDirty();
+    renderDayDetailView(dayDetailEditState.working.date,{ useWorking:true });
+  }
+
+  function removeShiftFromDay(dayIndex, shiftIndex){
+    if(!dayDetailEditState.active || dayDetailEditState.dayIndex!==dayIndex) return;
+    const shifts=dayDetailEditState.working?.shifts;
+    if(!Array.isArray(shifts)) return;
+    if(shiftIndex<0 || shiftIndex>=shifts.length) return;
+    shifts.splice(shiftIndex,1);
+    markDayDetailDirty();
+    renderDayDetailView(dayDetailEditState.working.date,{ useWorking:true });
+  }
+
   function addAssignmentToShift(dayIndex, shiftIndex, role, employeeName){
-    const day=scheduleResults?.schedule?.[dayIndex];
+    const day=getEditableDay(dayIndex);
     if(!day) return;
     const shift=day.shifts?.[shiftIndex];
     if(!shift) return;
     if(!shift.assigned[role]){ shift.assigned[role]=[]; }
     if(!shift.assigned[role].includes(employeeName)){
       shift.assigned[role].push(employeeName);
-      refreshAfterAssignmentChange();
+      if(dayDetailEditState.active && dayDetailEditState.dayIndex===dayIndex){
+        markDayDetailDirty();
+        renderDayDetailView(day.date,{ useWorking:true });
+      }else{
+        refreshAfterAssignmentChange();
+      }
     }
   }
 
   function removeAssignmentFromShift(dayIndex, shiftIndex, role, employeeName){
-    const day=scheduleResults?.schedule?.[dayIndex];
+    const day=getEditableDay(dayIndex);
     if(!day) return;
     const shift=day.shifts?.[shiftIndex];
     if(!shift || !shift.assigned?.[role]) return;
     const idx=shift.assigned[role].indexOf(employeeName);
     if(idx!==-1){
       shift.assigned[role].splice(idx,1);
-      refreshAfterAssignmentChange();
+      if(dayDetailEditState.active && dayDetailEditState.dayIndex===dayIndex){
+        markDayDetailDirty();
+        renderDayDetailView(day.date,{ useWorking:true });
+      }else{
+        refreshAfterAssignmentChange();
+      }
     }
   }
 
@@ -1480,11 +1880,117 @@
   }
 
   // ===== Day Detail View =====
-  function renderDayDetailView(dateStr){
+  function cloneDaySnapshot(day){
+    return day ? JSON.parse(JSON.stringify(day)) : null;
+  }
+
+  function getEditableDay(dayIndex){
+    if(dayDetailEditState.active && dayDetailEditState.dayIndex===dayIndex){
+      return dayDetailEditState.working;
+    }
+    return scheduleResults?.schedule?.[dayIndex] || null;
+  }
+
+  function markDayDetailDirty(){
+    if(!dayDetailEditState.active) return;
+    dayDetailEditState.dirty=true;
+    updateDayDetailActionState();
+  }
+
+  function resetDayDetailState(){
+    dayDetailEditState={ active:false, dayIndex:null, original:null, working:null, dirty:false };
+    const select=qs('#dayShiftTemplate');
+    if(select){
+      select.innerHTML='';
+      select.disabled=true;
+    }
+    updateDayDetailActionState();
+  }
+
+  function beginDayDetailSession(dayIndex){
+    if(!scheduleResults || !Array.isArray(scheduleResults.schedule)) return false;
+    const day=scheduleResults.schedule[dayIndex];
+    if(!day) return false;
+    dayDetailEditState={
+      active:true,
+      dayIndex,
+      original:cloneDaySnapshot(day),
+      working:cloneDaySnapshot(day),
+      dirty:false
+    };
+    populateDayShiftTemplateOptions();
+    updateDayDetailActionState();
+    return true;
+  }
+
+  function populateDayShiftTemplateOptions(){
+    const select=qs('#dayShiftTemplate');
+    const addBtn=qs('#dayAddShift');
+    if(!select){
+      if(addBtn){ addBtn.disabled=true; }
+      return;
+    }
+    const templates=scheduleData?.shifts || [];
+    select.innerHTML=templates.map((shift, index)=>`<option value="${index}">${shift.name || 'Shift'} (${shift.startTime}-${shift.endTime})</option>`).join('');
+    const hasTemplates=templates.length>0;
+    select.disabled=!hasTemplates;
+    if(addBtn){
+      addBtn.disabled=!hasTemplates || !dayDetailEditState.active;
+    }
+  }
+
+  function updateDayDetailActionState(){
+    const saveBtn=qs('#daySaveChanges');
+    const discardBtn=qs('#dayDiscardChanges');
+    const hint=qs('#dayPendingHint');
+    const addBtn=qs('#dayAddShift');
+    if(saveBtn){
+      saveBtn.disabled=!(dayDetailEditState.active && dayDetailEditState.dirty);
+    }
+    if(discardBtn){
+      discardBtn.disabled=!(dayDetailEditState.active && dayDetailEditState.dirty);
+    }
+    if(hint){
+      hint.style.display=(dayDetailEditState.active && dayDetailEditState.dirty)?'block':'none';
+    }
+    if(addBtn){
+      const templates=scheduleData?.shifts || [];
+      addBtn.disabled=!(dayDetailEditState.active) || !templates.length;
+    }
+  }
+
+  function applyDayDetailChanges(){
+    if(!dayDetailEditState.active || !dayDetailEditState.dirty) return;
+    const dayIndex=dayDetailEditState.dayIndex;
+    if(!scheduleResults?.schedule?.[dayIndex]) return;
+    scheduleResults.schedule[dayIndex]=cloneDaySnapshot(dayDetailEditState.working);
+    dayDetailEditState.original=cloneDaySnapshot(dayDetailEditState.working);
+    dayDetailEditState.dirty=false;
+    updateDayDetailActionState();
+    refreshAfterAssignmentChange();
+  }
+
+  function discardDayDetailChanges(){
+    if(!dayDetailEditState.active) return;
+    dayDetailEditState.working=cloneDaySnapshot(dayDetailEditState.original);
+    dayDetailEditState.dirty=false;
+    renderDayDetailView(currentDayDetailDate,{ useWorking:true });
+    updateDayDetailActionState();
+  }
+
+  function sortShiftsByStart(shifts){
+    if(!Array.isArray(shifts)) return;
+    shifts.sort((a,b)=> timeToMinutes(a.startTime||'00:00') - timeToMinutes(b.startTime||'00:00'));
+  }
+
+  function renderDayDetailView(dateStr, options={}){
     if(!scheduleResults || !Array.isArray(scheduleResults.schedule)) return false;
     const dayIndex=scheduleResults.schedule.findIndex(d=>d.date===dateStr);
     if(dayIndex===-1) return false;
-    const day=scheduleResults.schedule[dayIndex];
+    let day=scheduleResults.schedule[dayIndex];
+    if(options.useWorking!==false && dayDetailEditState.active && dayDetailEditState.dayIndex===dayIndex && dayDetailEditState.working){
+      day=dayDetailEditState.working;
+    }
 
     const dayTitle = qs('#dayTitle');
     if(dayTitle){
@@ -1501,15 +2007,60 @@
       dayMeta.innerHTML = metaHTML;
     }
 
-    renderDayGantt(day);
+    if(dayDetailEditState.active){
+      populateDayShiftTemplateOptions();
+    }
+
+    renderDayGantt(day, dayIndex);
     renderDayAssignments(day, dayIndex);
+    updateDayDetailActionState();
+    return true;
+  }
+
+  function renderEmptyDayDetailView(dateStr){
+    const dayTitle = qs('#dayTitle');
+    const dateObj = new Date(dateStr);
+    if(dayTitle){
+      if(!Number.isNaN(dateObj.getTime())){
+        dayTitle.textContent = `${dayNamesLong[dateObj.getDay()]}, ${monthNamesFull[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+      }else{
+        dayTitle.textContent = 'Day Detail';
+      }
+    }
+
+    const dayMeta = qs('#dayMeta');
+    if(dayMeta){
+      dayMeta.innerHTML = '<div class="badge warn">No schedule generated for this date.</div>';
+    }
+
+    const ganttRows = qs('#ganttRows');
+    if(ganttRows){
+      ganttRows.innerHTML = '<p class="muted">No Gantt data available. Generate a schedule covering this date.</p>';
+    }
+
+    const assignments = qs('#dayAssignments');
+    if(assignments){
+      assignments.innerHTML = '<p class="muted">No shifts configured for this day.</p>';
+    }
+
     return true;
   }
 
   function openDayDetail(dateStr) {
     currentDayDetailDate=dateStr;
-    const rendered = renderDayDetailView(dateStr);
     const overlay = qs('#dayDetailOverlay');
+    let rendered=false;
+    if(scheduleResults && Array.isArray(scheduleResults.schedule)){
+      const dayIndex=scheduleResults.schedule.findIndex(d=>d.date===dateStr);
+      if(dayIndex!==-1){
+        beginDayDetailSession(dayIndex);
+        rendered=renderDayDetailView(dateStr,{ useWorking:true });
+      }
+    }
+    if(!rendered){
+      resetDayDetailState();
+      rendered = renderEmptyDayDetailView(dateStr);
+    }
     if (rendered && overlay) {
       overlay.style.display = 'block';
       overlay.setAttribute('aria-hidden', 'false');
@@ -1520,6 +2071,7 @@
   
   function closeDayDetail() {
     currentDayDetailDate=null;
+    resetDayDetailState();
     const overlay = qs('#dayDetailOverlay');
     if (overlay) {
       overlay.style.display = 'none';
@@ -1706,7 +2258,8 @@
             guard:parseInt(nums[0]?.value||'0',10),
             supervisor:parseInt(nums[1]?.value||'0',10),
             senior:parseInt(nums[2]?.value||'0',10)
-          }
+          },
+          isRefillTemplate: row.dataset?.refillTemplate==='true'
         });
       });
 
@@ -1761,7 +2314,16 @@
       if(shiftBody){
         shiftBody.innerHTML='';
         const shifts=Array.isArray(config.shifts) && config.shifts.length ? config.shifts : null;
-        if(shifts){ shifts.forEach(shift=>addShift(shift)); } else { addShift(); }
+        if(shifts){
+          shifts.forEach(shift=>addShift({
+            ...shift,
+            locked: shift.isRefillTemplate,
+            isRefillTemplate: shift.isRefillTemplate
+          }));
+        } else {
+          addShift();
+        }
+        ensureRefillShiftPresence();
       }
 
       const employeeBody=qs('#employeeTableBody');
@@ -1996,6 +2558,50 @@
           personalState.weekIndex+=1;
           renderPersonalView();
         }
+      });
+    }
+
+    const dayOverlay=qs('#dayDetailOverlay');
+    if(dayOverlay){
+      dayOverlay.addEventListener('click',event=>{
+        if(event.target===dayOverlay){
+          closeDayDetail();
+        }
+      });
+    }
+
+    const configOverlay=qs('#employeeConfigOverlay');
+    if(configOverlay){
+      configOverlay.addEventListener('click',event=>{
+        if(event.target===configOverlay){
+          closeEmployeeConfig();
+        }
+      });
+    }
+
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){
+        closeDayDetail();
+        closeEmployeeConfig();
+      }
+    });
+
+    const daySaveBtn=qs('#daySaveChanges');
+    if(daySaveBtn){
+      daySaveBtn.addEventListener('click',()=> applyDayDetailChanges());
+    }
+    const dayDiscardBtn=qs('#dayDiscardChanges');
+    if(dayDiscardBtn){
+      dayDiscardBtn.addEventListener('click',()=> discardDayDetailChanges());
+    }
+    const dayAddShiftBtn=qs('#dayAddShift');
+    if(dayAddShiftBtn){
+      dayAddShiftBtn.addEventListener('click',()=>{
+        const select=qs('#dayShiftTemplate');
+        if(!select) return;
+        const index=parseInt(select.value,10);
+        if(Number.isNaN(index)) return;
+        addShiftToDayFromTemplate(index);
       });
     }
 

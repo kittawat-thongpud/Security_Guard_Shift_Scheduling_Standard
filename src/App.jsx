@@ -533,6 +533,28 @@ export default function App() {
             </div>
           </div>
           <div id="dayMeta" className="meta" />
+          <div className="day-toolbar">
+            <div className="day-toolbar-left">
+              <label htmlFor="dayShiftTemplate">Add shift</label>
+              <div className="inline compact">
+                <select id="dayShiftTemplate" />
+                <button className="btn btn-secondary btn-compact" type="button" id="dayAddShift">
+                  Add Shift
+                </button>
+              </div>
+            </div>
+            <div className="day-toolbar-right">
+              <span id="dayPendingHint" className="pending-hint">
+                Unsaved changes
+              </span>
+              <button className="btn btn-secondary btn-compact" type="button" id="dayDiscardChanges">
+                Discard
+              </button>
+              <button className="btn btn-primary btn-compact" type="button" id="daySaveChanges" disabled>
+                Save
+              </button>
+            </div>
+          </div>
           <div className="gantt-wrap">
             <div className="gantt-legend">
               <span>
