@@ -832,8 +832,27 @@
     const refillTemplate=shiftTemplates.find(sp=>sp.isRefillTemplate);
     const defaultRefillDuration=refillTemplate?Math.round(durationHours(refillTemplate.startTime,refillTemplate.endTime)*60)||240:240;
     const dayOffMap=scheduleData.dayOffMap || (scheduleData.dayOffMap={});
+    const dailyEmployeeSpans=new Map();
+    const makeDayKey=(dateStr,name)=>`${dateStr}|${name}`;
 
     let totalRequired=0,totalAssigned=0,roleRequirementsMet=0,totalRoleRequirements=0;
+
+    const canAssignSpan=(key,start,end)=>{
+      const span=dailyEmployeeSpans.get(key);
+      if(!span) return true;
+      if(end < span.start || start > span.end) return false;
+      return true;
+    };
+
+    const registerSpan=(key,start,end)=>{
+      const span=dailyEmployeeSpans.get(key);
+      if(!span){
+        dailyEmployeeSpans.set(key,{ start, end });
+      }else{
+        span.start=Math.min(span.start,start);
+        span.end=Math.max(span.end,end);
+      }
+    };
 
     const isEmployeeUnavailable=(emp,dateStr)=>{
       if(!emp || !emp.name) return true;
@@ -841,16 +860,20 @@
       return isEmployeePlannedOff(dayOffMap,emp.name,dateStr);
     };
 
-    function assignEmployeeToShift(shift, role, name, durationMinutes){
+    function assignEmployeeToShift(dayKey, shift, role, name, startMinutes, endMinutes, durationMinutes){
       if(!shift.assigned[role]) shift.assigned[role]=[];
       const already=shift.assigned[role];
       if(already.includes(name)){
+        return false;
+      }
+      if(!canAssignSpan(dayKey,startMinutes,endMinutes)){
         return false;
       }
       already.push(name);
       const prev=employeeMinutes.get(name)||0;
       employeeMinutes.set(name, prev + durationMinutes);
       totalAssigned+=1;
+      registerSpan(dayKey,startMinutes,endMinutes);
       return true;
     }
 
@@ -886,9 +909,18 @@
           assigned:{ guard:[], supervisor:[], senior:[] },
           isRefill:true,
           sourceName:baseShift.name,
-          refillKey:key
+          refillKey:key,
+          __startMinutes:baseShift.__startMinutes ?? timeToMinutes(baseShift.startTime),
+          __endMinutes:baseShift.__endMinutes ?? (()=>{ const endM=timeToMinutes(baseShift.endTime); const startM=timeToMinutes(baseShift.startTime); return endM<=startM?endM+1440:endM; })()
         };
         daySchedule.shifts.push(shift);
+      }
+      if(shift.__startMinutes==null){
+        shift.__startMinutes=baseShift.__startMinutes ?? timeToMinutes(baseShift.startTime);
+      }
+      if(shift.__endMinutes==null){
+        const endM=baseShift.__endMinutes ?? (()=>{ const e=timeToMinutes(baseShift.endTime); const s=timeToMinutes(baseShift.startTime); return e<=s?e+1440:e; })();
+        shift.__endMinutes=endM;
       }
       if(!shift.__durationMinutes){
         const minutes=Math.round(durationHours(shift.startTime,shift.endTime)*60);
@@ -906,10 +938,16 @@
       totalRoleRequirements+=1;
       let filled=0;
       const existing=new Set(refillShift.assigned[role]||[]);
+      const baseAssigned=new Set(Object.values(baseShift.assigned||{}).flat());
+      baseAssigned.forEach(name=>existing.add(name));
       const primary=getCandidates(role,dateStr,{ includeSpare:false, excludeNames:existing });
       primary.forEach(name=>{
         if(filled>=shortage) return;
-        if(assignEmployeeToShift(refillShift, role, name, duration)){
+        const startMinutes=refillShift.__startMinutes ?? timeToMinutes(refillShift.startTime);
+        let endMinutes=refillShift.__endMinutes ?? timeToMinutes(refillShift.endTime);
+        if(endMinutes<=startMinutes){ endMinutes+=1440; }
+        const dayKey=makeDayKey(dateStr,name);
+        if(assignEmployeeToShift(dayKey, refillShift, role, name, startMinutes, endMinutes, duration)){
           existing.add(name);
           filled++;
         }
@@ -918,7 +956,11 @@
         const spare=getCandidates(role,dateStr,{ includeSpare:true, excludeNames:existing });
         spare.forEach(name=>{
           if(filled>=shortage) return;
-          if(assignEmployeeToShift(refillShift, role, name, duration)){
+          const startMinutes=refillShift.__startMinutes ?? timeToMinutes(refillShift.startTime);
+          let endMinutes=refillShift.__endMinutes ?? timeToMinutes(refillShift.endTime);
+          if(endMinutes<=startMinutes){ endMinutes+=1440; }
+          const dayKey=makeDayKey(dateStr,name);
+          if(assignEmployeeToShift(dayKey, refillShift, role, name, startMinutes, endMinutes, duration)){
             existing.add(name);
             filled++;
           }
@@ -938,23 +980,28 @@
       const dayOfWeek=d.getDay();
       const isWeekend=(dayOfWeek===0||dayOfWeek===6);
       const holidayName=scheduleData.holidays[dateStr]||'';
-    const dayShifts=baseShiftTemplates.map(sp=>({
-      name:sp.name,
-      startTime:sp.startTime,
-      endTime:sp.endTime,
-      requirements:{ guard:sp.requirements?.guard||0, supervisor:sp.requirements?.supervisor||0, senior:sp.requirements?.senior||0 },
-      assigned:{ guard:[], supervisor:[], senior:[] },
-      isRefill:false,
-      sourceName:sp.name,
-      __durationMinutes: Math.round(durationHours(sp.startTime,sp.endTime)*60) || (sp.size?sp.size*60:480)
-    }));
-    dayShifts.sort((a,b)=>{
-      const startA=timeToMinutes(a.startTime);
-      const startB=timeToMinutes(b.startTime);
-      if(startA!==startB) return startA-startB;
-      return a.name.localeCompare(b.name);
-    });
-    const daySchedule={ date:dateStr, dayOfWeek, isWeekend, isHoliday:!!holidayName, holidayName, shifts:dayShifts };
+      const dayShifts=baseShiftTemplates.map(sp=>{
+        const startMinutes=timeToMinutes(sp.startTime);
+        let endMinutes=timeToMinutes(sp.endTime);
+        if(endMinutes<=startMinutes){ endMinutes+=1440; }
+        return {
+          name:sp.name,
+          startTime:sp.startTime,
+          endTime:sp.endTime,
+          requirements:{ guard:sp.requirements?.guard||0, supervisor:sp.requirements?.supervisor||0, senior:sp.requirements?.senior||0 },
+          assigned:{ guard:[], supervisor:[], senior:[] },
+          isRefill:false,
+          sourceName:sp.name,
+          __durationMinutes: Math.round(durationHours(sp.startTime,sp.endTime)*60) || (sp.size?sp.size*60:480),
+          __startMinutes:startMinutes,
+          __endMinutes:endMinutes
+        };
+      });
+      dayShifts.sort((a,b)=>{
+        if(a.__startMinutes!==b.__startMinutes){ return a.__startMinutes-b.__startMinutes; }
+        return a.name.localeCompare(b.name);
+      });
+      const daySchedule={ date:dateStr, dayOfWeek, isWeekend, isHoliday:!!holidayName, holidayName, shifts:dayShifts };
 
       dayShifts.forEach(shift=>{
         const duration=shift.__durationMinutes || Math.round(durationHours(shift.startTime,shift.endTime)*60) || 480;
@@ -968,7 +1015,11 @@
           const candidates=getCandidates(role,dateStr,{ includeSpare:false, excludeNames:assignedSet });
           for(const name of candidates){
             if(filled>=req) break;
-            if(assignEmployeeToShift(shift, role, name, duration)){
+            const startMinutes=shift.__startMinutes ?? timeToMinutes(shift.startTime);
+            let endMinutes=shift.__endMinutes ?? timeToMinutes(shift.endTime);
+            if(endMinutes<=startMinutes){ endMinutes+=1440; }
+            const dayKey=makeDayKey(dateStr,name);
+            if(assignEmployeeToShift(dayKey, shift, role, name, startMinutes, endMinutes, duration)){
               assignedSet.add(name);
               filled++;
             }
@@ -977,7 +1028,11 @@
             const spareCandidates=getCandidates(role,dateStr,{ includeSpare:true, excludeNames:assignedSet });
             for(const name of spareCandidates){
               if(filled>=req) break;
-              if(assignEmployeeToShift(shift, role, name, duration)){
+              const startMinutes=shift.__startMinutes ?? timeToMinutes(shift.startTime);
+              let endMinutes=shift.__endMinutes ?? timeToMinutes(shift.endTime);
+              if(endMinutes<=startMinutes){ endMinutes+=1440; }
+              const dayKey=makeDayKey(dateStr,name);
+              if(assignEmployeeToShift(dayKey, shift, role, name, startMinutes, endMinutes, duration)){
                 assignedSet.add(name);
                 filled++;
               }
@@ -990,6 +1045,13 @@
             allocateRefill(role, remaining, dateStr, daySchedule, shift);
           }
         });
+      });
+
+      daySchedule.shifts.sort((a,b)=>{
+        const startA=a.__startMinutes ?? timeToMinutes(a.startTime);
+        const startB=b.__startMinutes ?? timeToMinutes(b.startTime);
+        if(startA!==startB) return startA-startB;
+        return a.name.localeCompare(b.name);
       });
 
       schedule.push(daySchedule);
@@ -1279,12 +1341,6 @@
 
     const meta=document.createElement('div');
     meta.className='day-card-meta';
-    if(day.dayData?.isWeekend){
-      const weekendBadge=document.createElement('span');
-      weekendBadge.className='badge';
-      weekendBadge.textContent='Weekend';
-      meta.appendChild(weekendBadge);
-    }
     if(day.dayData?.isHoliday){
       const holidayBadge=document.createElement('span');
       holidayBadge.className='badge warn';
@@ -1511,7 +1567,8 @@
     assignments.forEach(assignment=>{
       const tag=document.createElement('div');
       const roleClass=assignment.role ? `role-${assignment.role}` : 'role-guard';
-      tag.className=`personal-shift-tag ${roleClass}`;
+      const refillClass=assignment.isRefill ? 'personal-shift-refill' : '';
+      tag.className=`personal-shift-tag ${roleClass} ${refillClass}`.trim();
       tag.textContent=`${assignment.shiftName} (${assignment.startTime}-${assignment.endTime})`;
       tags.appendChild(tag);
     });
@@ -2160,7 +2217,7 @@
 
     const dayMeta = qs('#dayMeta');
     if(dayMeta){
-      let metaHTML = `<div class="badge">${day.isWeekend ? 'Weekend' : 'Weekday'}</div>`;
+      let metaHTML = '';
       if (day.isHoliday) {
         metaHTML += `<div class="badge warn">Holiday: ${day.holidayName}</div>`;
       }
@@ -2278,7 +2335,8 @@
               shiftName:shift.name,
               role,
               startTime:shift.startTime,
-              endTime:shift.endTime
+              endTime:shift.endTime,
+              isRefill:!!shift.isRefill
             });
           });
         });

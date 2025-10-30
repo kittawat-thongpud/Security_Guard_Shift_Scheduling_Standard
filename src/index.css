@@ -134,6 +134,7 @@
     .personal-shift-tag.role-guard{background:#dbeafe;color:#1e40af}
     .personal-shift-tag.role-supervisor{background:#f3e8ff;color:#7e22ce}
     .personal-shift-tag.role-senior{background:#fef3c7;color:#b45309}
+    .personal-shift-refill{border:1px dashed #4338ca;background:#ede9fe;color:#312e81}
     .personal-dayoff-tag{background:#d1fae5;color:#047857;padding:4px 6px;border-radius:4px;font-weight:600}
     .personal-empty{font-size:.8rem;color:#94a3b8}
 
