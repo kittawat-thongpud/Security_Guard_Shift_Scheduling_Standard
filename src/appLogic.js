@@ -2267,7 +2267,8 @@ const publishDefaults={
         if(assignment.endMinutes>totalMinutes){
           bar.dataset.continues='true';
         }
-        bar.textContent=`${assignment.shiftName} (${assignment.displayStart}-${assignment.displayEnd})`;
+        const timeLabel=`${assignment.displayStart}-${assignment.displayEnd}`;
+        bar.innerHTML=`${escapeHtml(assignment.shiftName)}<span class="gantt-bar-time">${escapeHtml(timeLabel)}</span>`;
         track.appendChild(bar);
       });
 
