@@ -1,10 +1,384 @@
 'use strict';
+
+  // ===== Localization =====
+  const localeStrings={
+    en:{
+      languageLabel:'Language',
+      languageEnglish:'English',
+      languageThai:'Thai',
+      themeLabel:'Theme',
+      themeDark:'Dark',
+      themeLight:'Light',
+      headerTitle:'Enhanced Security Guard Scheduling',
+      headerSubtitle:'Thailand calendar, role constraints, and editable rosters',
+      testSetupTitle:'Test Setup',
+      schedulePeriodLabel:'Schedule Period',
+      timezoneLabel:'Timezone',
+      countryLabel:'Country for Holidays',
+      shiftPatternTitle:'Shift Pattern Registration',
+      shiftNameHeader:'Shift Name',
+      shiftNamePlaceholder:'Shift name',
+      shiftMorningName:'Morning',
+      shiftAfternoonName:'Afternoon',
+      shiftNightName:'Night',
+      startTimeHeader:'Start Time',
+      shiftSizeHeader:'Size (hrs)',
+      endTimeHeader:'End Time',
+      guardNeededHeader:'Guard Roles Needed',
+      supervisorNeededHeader:'Supervisor Roles Needed',
+      seniorNeededHeader:'Senior Roles Needed',
+      actionsHeader:'Actions',
+      addShiftButton:'Add Shift',
+      removeButton:'Remove',
+      employeeConstraintsTitle:'Employee Constraints',
+      maxWeeklyHoursLabel:'Max Weekly Hours per Employee',
+      maxConsecutiveDaysLabel:'Max Consecutive Working Days',
+      minDayOffLabel:'Minimum Full Day Off After Max Consecutive',
+      maxContinuousHoursLabel:'Max Continuous Hours Per Day',
+      employeeRosterTitle:'Employee Roster',
+      employeeNameHeader:'Employee Name',
+      employeeNamePlaceholder:'Employee name',
+      roleHeader:'Role',
+      maxHoursHeader:'Max Weekly Hours',
+      unavailableDatesHeader:'Unavailable Dates',
+      unavailRegisterTitle:'Unavailable Dates Register',
+      unavailableDatesPanelHint:'(panel)',
+      preferredShiftsHeader:'Preferred Shifts',
+      preferredShiftsHint:'Multiple selections allowed. Options sync with global shift list.',
+      spareHeader:'Spare',
+      markAsSpare:'Mark as Spare',
+      editButton:'Edit',
+      addEmployeeButton:'Add Employee',
+      employeeConfigTitle:'Employee Config',
+      holidayRegisterTitle:'Holiday Register',
+      holidayDateHeader:'Date',
+      holidayNameHeader:'Name',
+      holidayNamePlaceholder:'Holiday name',
+      addHolidayButton:'Add Holiday',
+      loadCountryDefaultsButton:'Load Country Defaults',
+      clearAllButton:'Clear All',
+      holidayHint:'Defaults come from selected country and are filterable by date range.',
+      generateScheduleButton:'Generate Schedule',
+      resultsTitle:'Schedule Results',
+      constraintWeeklyHours:'Weekly Hours',
+      constraintConsecutiveDays:'Consecutive Days',
+      coverageRateTitle:'Coverage Rate',
+      coverageRateSubtitle:'Staffing vs Requirement',
+      roleComplianceTitle:'Role Compliance',
+      roleComplianceSubtitle:'Role Requirements Met',
+      constraintTitle:'Constraint Satisfaction',
+      constraintSubtitle:'Rules Applied',
+      processingTimeTitle:'Processing Time',
+      processingTimeSubtitle:'Algorithm Execution',
+      siteTab:'Site Schedule View',
+      personalTab:'Personal Schedules',
+      constraintTab:'Constraint Analysis',
+      exportButton:'Export Schedule',
+      windowLabel:'Window',
+      employeeLabel:'Employee',
+      monthLabel:'Month',
+      yearLabel:'Year',
+      previous:'Previous',
+      next:'Next',
+      weekCounter:'Week {current} / {total}',
+      noWeeks:'No weeks',
+      noScheduleDays:'No schedule days available. Run the scheduler or adjust filters.',
+      runSchedulerPrompt:'Run the scheduler to view the calendar.',
+      noPersonalRoster:'Add employees to view personal schedules.',
+      runSchedulerPersonal:'Run the scheduler to view personal schedules.',
+      selectEmployeePrompt:'Select an employee to view the Gantt chart.',
+      noDataInRange:'No schedule data within the selected range.',
+      dayOffLabel:'Day Off',
+      noShiftLabel:'No shift',
+      noShiftsScheduled:'No shifts scheduled.',
+      noShiftsConfigured:'No shifts configured for this day.',
+      noShiftsDefined:'No shifts defined.',
+      holidayEmptyRegister:'No public holidays configured.',
+      noScheduleData:'No schedule data available.',
+      noAssignmentsForDay:'No assignments for this day.',
+      noAssignments:'No assignments',
+      noAvailableEmployees:'No available employees',
+      loadingHolidays:'Loading public holidays…',
+      holidayNone:'No public holidays within selected period.',
+      holidayErrorInvalidDates:'Enter valid schedule dates to load holidays.',
+      holidayPromptSetRange:'Set a schedule period to load public holidays.',
+      holidayLoadError:'Unable to load public holidays. Please try again later.',
+      holidayLoadFallback:'Primary holiday service is unavailable. Holidays have been loaded from OpenHolidays.org.',
+      holidayLoadFailure:'Unable to load public holidays from any online source. Please try again later.',
+      errorFillRequired:'Please fill in all required fields.',
+      errorDefineShift:'Define at least one shift pattern.',
+      errorDefineEmployee:'Add at least one employee.',
+      errorLockedShift:'This shift is locked and cannot be removed.',
+      lockedLabel:'Locked',
+      errorInvalidPeriod:'End date must be after start date.',
+      errorShortShift:'Skipping shift shorter than minimum duration.',
+      shiftStaffing:'Staff {assigned}/{required}',
+      listNoStaff:'No staff assigned',
+      noneLabel:'none',
+      roleRequiredLabel:'Required: {count}',
+      removeAssignmentAria:'Remove {name}',
+      selectRolePlaceholder:'Select {role}',
+      unsavedChanges:'Unsaved changes',
+      addDateButton:'Add Date',
+      closeButton:'Close',
+      saveButton:'Save',
+      discardButton:'Discard',
+      addShiftLabel:'Add shift',
+      addLabel:'Add',
+      dayDetailTitle:'Day Detail',
+      refillsDisabled:'Refills disabled; shortage remains',
+      toolbarWeek:'Week',
+      toolbarMonth:'Month',
+      weekdayShort:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+      weekdayLong:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+      monthNamesFull:['January','February','March','April','May','June','July','August','September','October','November','December'],
+      roles:{ guard:'Guard', supervisor:'Supervisor', senior:'Senior Guard' }
+    },
+    th:{
+      languageLabel:'ภาษา',
+      languageEnglish:'อังกฤษ',
+      languageThai:'ไทย',
+      themeLabel:'โหมดสี',
+      themeDark:'โหมดมืด',
+      themeLight:'โหมดสว่าง',
+      headerTitle:'ระบบจัดตารางเวรเจ้าหน้าที่รักษาความปลอดภัย',
+      headerSubtitle:'ปฏิทินไทย กำหนดข้อจำกัดบทบาท และปรับตารางได้สะดวก',
+      testSetupTitle:'การตั้งค่าทดสอบ',
+      schedulePeriodLabel:'ช่วงเวลาตารางเวร',
+      timezoneLabel:'เขตเวลา',
+      countryLabel:'ประเทศสำหรับวันหยุด',
+      shiftPatternTitle:'กำหนดรูปแบบกะ',
+      shiftNameHeader:'ชื่อกะ',
+      shiftNamePlaceholder:'ชื่อกะ',
+      shiftMorningName:'กะเช้า',
+      shiftAfternoonName:'กะบ่าย',
+      shiftNightName:'กะกลางคืน',
+      startTimeHeader:'เวลาเริ่ม',
+      shiftSizeHeader:'ชั่วโมง',
+      endTimeHeader:'เวลาสิ้นสุด',
+      guardNeededHeader:'ต้องการเจ้าหน้าที่รักษาความปลอดภัย',
+      supervisorNeededHeader:'ต้องการหัวหน้ากะ',
+      seniorNeededHeader:'ต้องการเจ้าหน้าที่อาวุโส',
+      actionsHeader:'ดำเนินการ',
+      addShiftButton:'เพิ่มกะ',
+      removeButton:'ลบ',
+      employeeConstraintsTitle:'ข้อจำกัดพนักงาน',
+      maxWeeklyHoursLabel:'ชั่วโมงทำงานสูงสุดต่อสัปดาห์',
+      maxConsecutiveDaysLabel:'จำนวนวันทำงานต่อเนื่องสูงสุด',
+      minDayOffLabel:'วันหยุดต่อเนื่องขั้นต่ำหลังทำงานเต็มจำนวน',
+      maxContinuousHoursLabel:'ชั่วโมงทำงานต่อเนื่องสูงสุดต่อวัน',
+      employeeRosterTitle:'รายชื่อพนักงาน',
+      employeeNameHeader:'ชื่อพนักงาน',
+      employeeNamePlaceholder:'ชื่อพนักงาน',
+      roleHeader:'บทบาท',
+      maxHoursHeader:'ชั่วโมงสูงสุดต่อสัปดาห์',
+      unavailableDatesHeader:'วันที่ไม่ว่าง',
+      unavailRegisterTitle:'ทะเบียนวันที่ไม่ว่าง',
+      unavailableDatesPanelHint:'(แผง)',
+      preferredShiftsHeader:'กะที่ต้องการ',
+      preferredShiftsHint:'เลือกได้หลายรายการ ระบบซิงค์กับรายการกะหลัก',
+      spareHeader:'สำรอง',
+      markAsSpare:'ทำเครื่องหมายเป็นสำรอง',
+      editButton:'แก้ไข',
+      addEmployeeButton:'เพิ่มพนักงาน',
+      employeeConfigTitle:'ตั้งค่าพนักงาน',
+      holidayRegisterTitle:'รายการวันหยุด',
+      holidayDateHeader:'วันที่',
+      holidayNameHeader:'ชื่อ',
+      holidayNamePlaceholder:'ชื่อวันหยุด',
+      addHolidayButton:'เพิ่มวันหยุด',
+      loadCountryDefaultsButton:'นำเข้าวันหยุดอ้างอิง',
+      clearAllButton:'ล้างทั้งหมด',
+      holidayHint:'ดึงจากประเทศที่เลือกและสามารถกรองตามช่วงวันที่ได้',
+      generateScheduleButton:'สร้างตารางเวร',
+      resultsTitle:'ผลลัพธ์ตารางเวร',
+      constraintWeeklyHours:'ชั่วโมงต่อสัปดาห์',
+      constraintConsecutiveDays:'จำนวนวันทำงานต่อเนื่อง',
+      coverageRateTitle:'อัตราการครอบคลุม',
+      coverageRateSubtitle:'พนักงานเทียบกับความต้องการ',
+      roleComplianceTitle:'ความครบถ้วนตามบทบาท',
+      roleComplianceSubtitle:'ตรงตามบทบาทที่ต้องการ',
+      constraintTitle:'การปฏิบัติตามข้อจำกัด',
+      constraintSubtitle:'กฎที่ใช้',
+      processingTimeTitle:'เวลาประมวลผล',
+      processingTimeSubtitle:'เวลาทำงานของอัลกอริทึม',
+      siteTab:'ตารางเวรหน้างาน',
+      personalTab:'ตารางเวรบุคคล',
+      constraintTab:'วิเคราะห์ข้อจำกัด',
+      exportButton:'ส่งออกตาราง',
+      windowLabel:'ช่วงมุมมอง',
+      employeeLabel:'พนักงาน',
+      monthLabel:'เดือน',
+      yearLabel:'ปี',
+      previous:'ก่อนหน้า',
+      next:'ถัดไป',
+      weekCounter:'สัปดาห์ {current} / {total}',
+      noWeeks:'ไม่มีข้อมูลสัปดาห์',
+      noScheduleDays:'ไม่มีข้อมูลตารางในช่วงนี้ โปรดสร้างตารางใหม่หรือปรับตัวกรอง',
+      runSchedulerPrompt:'สร้างตารางเพื่อแสดงปฏิทิน',
+      noPersonalRoster:'เพิ่มพนักงานเพื่อดูตารางบุคคล',
+      runSchedulerPersonal:'สร้างตารางเพื่อดูตารางบุคคล',
+      selectEmployeePrompt:'เลือกพนักงานเพื่อดูแผนผังกะ',
+      noDataInRange:'ไม่มีข้อมูลในช่วงที่เลือก',
+      dayOffLabel:'วันหยุด',
+      noShiftLabel:'ไม่มีเวร',
+      noShiftsScheduled:'ไม่มีการจัดเวร',
+      noShiftsConfigured:'ยังไม่ได้กำหนดเวรสำหรับวันนี้',
+      noShiftsDefined:'ยังไม่ได้กำหนดรูปแบบกะ',
+      holidayEmptyRegister:'ไม่มีวันหยุดในรายการ',
+      noScheduleData:'ไม่มีข้อมูลตารางในระบบ',
+      noAssignmentsForDay:'ไม่มีการมอบหมายในวันนี้',
+      noAssignments:'ไม่ได้จัดพนักงาน',
+      noAvailableEmployees:'ไม่มีพนักงานว่าง',
+      loadingHolidays:'กำลังโหลดวันหยุด…',
+      holidayNone:'ไม่มีวันหยุดในช่วงวันที่เลือก',
+      holidayErrorInvalidDates:'กรุณาระบุวันที่เริ่มและสิ้นสุดให้ถูกต้อง',
+      holidayPromptSetRange:'กรุณากำหนดช่วงวันที่เพื่อโหลดวันหยุด',
+      holidayLoadError:'ไม่สามารถโหลดวันหยุด โปรดลองอีกครั้ง',
+      holidayLoadFallback:'ไม่สามารถใช้บริการหลัก จึงใช้ข้อมูลจาก OpenHolidays.org',
+      holidayLoadFailure:'ไม่สามารถโหลดวันหยุดจากแหล่งข้อมูลออนไลน์ได้',
+      errorFillRequired:'กรุณากรอกข้อมูลที่จำเป็นให้ครบ',
+      errorDefineShift:'กรุณากำหนดรูปแบบกะอย่างน้อยหนึ่งรายการ',
+      errorDefineEmployee:'กรุณาเพิ่มพนักงานอย่างน้อยหนึ่งคน',
+      errorLockedShift:'ไม่สามารถลบกะที่ถูกล็อกได้',
+      lockedLabel:'ล็อก',
+      errorInvalidPeriod:'วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น',
+      errorShortShift:'ข้ามกะที่มีระยะเวลาสั้นเกินไป',
+      shiftStaffing:'พนักงาน {assigned}/{required}',
+      listNoStaff:'ไม่มีพนักงานในกะนี้',
+      noneLabel:'ไม่มี',
+      roleRequiredLabel:'ต้องการ: {count}',
+      removeAssignmentAria:'ลบ {name}',
+      selectRolePlaceholder:'เลือก{role}',
+      unsavedChanges:'มีการแก้ไขค้างอยู่',
+      addDateButton:'เพิ่มวันที่',
+      closeButton:'ปิด',
+      saveButton:'บันทึก',
+      discardButton:'ยกเลิก',
+      addShiftLabel:'เพิ่มกะ',
+      addLabel:'เพิ่ม',
+      dayDetailTitle:'รายละเอียดกะ',
+      refillsDisabled:'ปิดการเติมกะอัตโนมัติ ความขาดแคลนยังคงอยู่',
+      toolbarWeek:'รายสัปดาห์',
+      toolbarMonth:'รายเดือน',
+      weekdayShort:['อา','จ','อ','พ','พฤ','ศ','ส'],
+      weekdayLong:['วันอาทิตย์','วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์'],
+      monthNamesFull:['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'],
+      roles:{ guard:'เจ้าหน้าที่รักษาความปลอดภัย', supervisor:'หัวหน้ากะ', senior:'เจ้าหน้าที่อาวุโส' }
+    }
+  };
+
+  let currentLanguage='th';
+  let currentTheme='light';
+  let dayNamesShort=localeStrings[currentLanguage].weekdayShort.slice();
+  let dayNamesLong=localeStrings[currentLanguage].weekdayLong.slice();
+  let monthNamesFull=localeStrings[currentLanguage].monthNamesFull.slice();
+  let roleLabels={ ...localeStrings[currentLanguage].roles };
+  const languageListeners=new Set();
+  const themeListeners=new Set();
+
+  function getLocaleStrings(lang=currentLanguage){
+    return localeStrings[lang] || localeStrings.en;
+  }
+
+  function notifyLanguageListeners(){
+    languageListeners.forEach(listener=>{
+      try{ listener(currentLanguage); }catch(err){ console.error('Language listener failed', err); }
+    });
+  }
+
+  function notifyThemeListeners(){
+    themeListeners.forEach(listener=>{
+      try{ listener(currentTheme); }catch(err){ console.error('Theme listener failed', err); }
+    });
+  }
+
+  function setLanguage(lang){
+    const nextLanguage=localeStrings[lang]?lang:'en';
+    const changed=nextLanguage!==currentLanguage;
+    currentLanguage=nextLanguage;
+    const locale=getLocaleStrings();
+    dayNamesShort=locale.weekdayShort.slice();
+    dayNamesLong=locale.weekdayLong.slice();
+    monthNamesFull=locale.monthNamesFull.slice();
+    roleLabels={ ...locale.roles };
+    document.documentElement.setAttribute('lang', currentLanguage==='th'?'th':'en');
+
+    if(changed){
+      notifyLanguageListeners();
+      if(!isApplyingConfiguration){
+        queueAutoPersist();
+      }
+    }
+
+    updateCalendarControlsUI?.();
+    updatePersonalControlsUI?.();
+    if(scheduleResults?.schedule?.length){
+      generateSiteCalendar?.();
+      generatePersonalSchedules?.();
+      generateConstraintAnalysis?.();
+    }
+    return currentLanguage;
+  }
+
+  function getCurrentLanguage(){
+    return currentLanguage;
+  }
+
+  function setTheme(theme){
+    const nextTheme=theme==='dark'?'dark':'light';
+    const changed=nextTheme!==currentTheme;
+    currentTheme=nextTheme;
+    if(typeof document!=='undefined'){
+      document.documentElement.setAttribute('data-theme', currentTheme);
+    }
+    if(changed){
+      notifyThemeListeners();
+      if(!isApplyingConfiguration){
+        queueAutoPersist();
+      }
+    }
+    return currentTheme;
+  }
+
+  function getCurrentTheme(){
+    return currentTheme;
+  }
+
+  function onLanguageChange(listener){
+    if(typeof listener!=='function') return ()=>{};
+    languageListeners.add(listener);
+    return ()=>languageListeners.delete(listener);
+  }
+
+  function onThemeChange(listener){
+    if(typeof listener!=='function') return ()=>{};
+    themeListeners.add(listener);
+    return ()=>themeListeners.delete(listener);
+  }
+
+  function translate(key, replacements=null, lang=currentLanguage){
+    const locale=getLocaleStrings(lang);
+    let value=locale[key];
+    if(value==null){
+      value=localeStrings.en[key];
+    }
+    if(typeof value==='string' && replacements){
+      return value.replace(/\{(\w+)\}/g,(m,p)=> replacements[p] ?? m);
+    }
+    return value;
+  }
+
   // ===== Utilities =====
   const qs=(s,r=document)=>r.querySelector(s);
   const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const uniqueDates=a=>Array.from(new Set(a.filter(Boolean)));
   const datesCSVToArray=csv=>csv?csv.split(',').map(s=>s.trim()).filter(Boolean):[];
-  const renderChips=(el,items)=>{el.innerHTML=items.length?items.map(x=>'<span class="chip">'+x+'</span>').join(''):'<span class="muted">none</span>';};
+  const renderChips=(el,items)=>{
+    el.innerHTML=items.length
+      ? items.map(x=>'<span class="chip">'+x+'</span>').join('')
+      : `<span class="muted">${translate('noneLabel')}</span>`;
+  };
 
   // ===== Time helpers =====
   function pad2(n){return String(n).padStart(2,'0');}
@@ -21,7 +395,6 @@
     return pad2(hours)+':'+pad2(mins);
   }
 
-  const roleLabels={ guard:'Guard', supervisor:'Supervisor', senior:'Senior Guard' };
   const roleTaskTemplates={
     guard:[
       'Perform perimeter patrol and access control checks.',
@@ -39,10 +412,6 @@
       'Complete equipment readiness inspection.'
     ]
   };
-
-  const dayNamesShort=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const dayNamesLong=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const monthNamesFull=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   const HOLIDAY_API_ENDPOINT='https://date.nager.at/api/v3/PublicHolidays';
   const OPEN_HOLIDAY_ENDPOINT='https://openholidaysapi.org/PublicHolidays';
@@ -322,18 +691,20 @@
     const reqSenior=requirements.senior ?? shiftData.senior ?? 0;
     const locked=!!shiftData.locked;
     const isRefillTemplate=!!shiftData.isRefillTemplate || name.trim().toLowerCase()==='refill';
+    const removeLabel=translate('removeButton');
+    const shiftPlaceholder=translate('shiftNamePlaceholder');
     tr.innerHTML=
-      '<td><input type="text" placeholder="Shift name" value="'+name+'" /></td>'+
-      '<td><input type="time" value="'+start+'" class="shift-start" /></td>'+
-      '<td><select class="shift-size">\
-          <option value="4"'+(size==='4'?' selected':'')+'>4</option><option value="8"'+(size==='8'?' selected':'')+'>8</option>\
-          <option value="12"'+(size==='12'?' selected':'')+'>12</option><option value="24"'+(size==='24'?' selected':'')+'>24</option>\
-         </select></td>'+
-      '<td><input type="time" value="'+endValue+'" class="shift-end" disabled /></td>'+
-      '<td><input type="number" value="'+reqGuard+'" min="0" /></td>'+
-      '<td><input type="number" value="'+reqSupervisor+'" min="0" /></td>'+
-      '<td><input type="number" value="'+reqSenior+'" min="0" /></td>'+
-      '<td><button class="btn btn-secondary" onclick="removeShift(this)">Remove</button></td>';
+      `<td><input type="text" placeholder="${shiftPlaceholder}" value="${name}" /></td>`+
+      `<td><input type="time" value="${start}" class="shift-start" /></td>`+
+      `<td><select class="shift-size">\
+          <option value="4"${size==='4'?' selected':''}>4</option><option value="8"${size==='8'?' selected':''}>8</option>\
+          <option value="12"${size==='12'?' selected':''}>12</option><option value="24"${size==='24'?' selected':''}>24</option>\
+         </select></td>`+
+      `<td><input type="time" value="${endValue}" class="shift-end" disabled /></td>`+
+      `<td><input type="number" value="${reqGuard}" min="0" /></td>`+
+      `<td><input type="number" value="${reqSupervisor}" min="0" /></td>`+
+      `<td><input type="number" value="${reqSenior}" min="0" /></td>`+
+      `<td><button class="btn btn-secondary" onclick="removeShift(this)">${removeLabel}</button></td>`;
     tbody.appendChild(tr);
     if(isRefillTemplate){
       tr.dataset.refillTemplate='true';
@@ -363,7 +734,7 @@
       });
       if(removeBtn){
         removeBtn.disabled=true;
-        removeBtn.textContent='Locked';
+        removeBtn.textContent=translate('lockedLabel');
         removeBtn.classList.add('btn-locked');
       }
     }
@@ -373,53 +744,16 @@
   function removeShift(btn){
     const row=btn.closest('tr');
     if(row && row.dataset && row.dataset.locked==='true'){
-      alert('This shift is locked and cannot be removed.');
+      alert(translate('errorLockedShift'));
       return;
     }
     const body=qs('#shiftTableBody');
     if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); if(!isApplyingConfiguration) queueAutoPersist(); }
-    else{ alert('You need at least one shift pattern.'); }
+    else{ alert(translate('errorDefineShift')); }
   }
 
   function ensureRefillShiftPresence(){
-    const tbody=qs('#shiftTableBody');
-    if(!tbody) return;
-    const rows=qsa(':scope > tr', tbody);
-    const existing=rows.find(row=>{
-      const name=row.querySelector('td:nth-child(1) input')?.value||'';
-      return row.dataset?.refillTemplate==='true' || name.trim().toLowerCase()==='refill';
-    });
-    if(existing){
-      existing.dataset.refillTemplate='true';
-      existing.dataset.locked='true';
-      existing.classList.add('shift-row-locked');
-      const inputs=existing.querySelectorAll('input, select, button');
-      inputs.forEach(el=>{
-        if(el.tagName==='BUTTON'){
-          el.disabled=true;
-          el.textContent='Locked';
-          el.classList.add('btn-locked');
-        }else if(el.tagName==='SELECT'){
-          el.disabled=true;
-          el.classList.add('locked-input');
-        }else if(el instanceof HTMLInputElement){
-          if(el.type!=='hidden'){
-            el.readOnly=true;
-            el.classList.add('locked-input');
-          }
-        }
-      });
-      return;
-    }
-    addShift({
-      name:'Refill',
-      startTime:'00:00',
-      size:4,
-      endTime:addHoursToTime('00:00',4),
-      requirements:{ guard:1, supervisor:0, senior:0 },
-      locked:true,
-      isRefillTemplate:true
-    });
+    return;
   }
 
   // Robust delegated listeners: handle input and change from both time and select controls
@@ -447,14 +781,17 @@
     const unavailCSV=Array.isArray(employeeData.unavailableDates)?employeeData.unavailableDates.join(', '):(employeeData.unavailable||'');
     const prefsCSV=Array.isArray(employeeData.preferredShifts)?employeeData.preferredShifts.join(', '):(employeeData.preferred||'');
     const spare=!!employeeData.isSpare;
+    const namePlaceholder=translate('employeeNamePlaceholder');
+    const editLabel=translate('editButton');
+    const removeLabel=translate('removeButton');
     tr.innerHTML=
-      '<td><input type="text" placeholder="Employee name" value="'+name+'" /></td>'+
-      '<td><select><option value="guard"'+(role==='guard'?' selected':'')+'>Guard</option><option value="supervisor"'+(role==='supervisor'?' selected':'')+'>Supervisor</option><option value="senior"'+(role==='senior'?' selected':'')+'>Senior Guard</option></select></td>'+
-      '<td><input type="number" value="'+hours+'" min="1" /></td>'+
-      '<td><input type="hidden" class="unavail-input" value="'+(Array.isArray(employeeData.unavailableDates)?employeeData.unavailableDates.join(','):unavailCSV)+'" /><div class="chips unavail-preview"></div></td>'+
-      '<td><input type="hidden" class="prefs-input" value="'+(Array.isArray(employeeData.preferredShifts)?employeeData.preferredShifts.join(','):prefsCSV)+'" /><div class="chips prefs-preview"></div></td>'+
-      '<td><input type="checkbox" class="spare-flag"'+(spare?' checked':'')+' /></td>'+
-      '<td><div class="inline"><button class="btn btn-primary" onclick="openEmployeeConfig(this)">Edit</button><button class="btn btn-secondary" onclick="removeEmployee(this)">Remove</button></div></td>';
+      `<td><input type="text" placeholder="${namePlaceholder}" value="${name}" /></td>`+
+      `<td><select><option value="guard"${role==='guard'?' selected':''}>${roleLabels.guard}</option><option value="supervisor"${role==='supervisor'?' selected':''}>${roleLabels.supervisor}</option><option value="senior"${role==='senior'?' selected':''}>${roleLabels.senior}</option></select></td>`+
+      `<td><input type="number" value="${hours}" min="1" /></td>`+
+      `<td><input type="hidden" class="unavail-input" value="${Array.isArray(employeeData.unavailableDates)?employeeData.unavailableDates.join(','):unavailCSV}" /><div class="chips unavail-preview"></div></td>`+
+      `<td><input type="hidden" class="prefs-input" value="${Array.isArray(employeeData.preferredShifts)?employeeData.preferredShifts.join(','):prefsCSV}" /><div class="chips prefs-preview"></div></td>`+
+      `<td><input type="checkbox" class="spare-flag"${spare?' checked':''} /></td>`+
+      `<td><div class="inline"><button class="btn btn-primary" onclick="openEmployeeConfig(this)">${editLabel}</button><button class="btn btn-secondary" onclick="removeEmployee(this)">${removeLabel}</button></div></td>`;
     tbody.appendChild(tr);
     updateUnavailPreview(tr);
     updatePrefsPreview(tr);
@@ -464,7 +801,7 @@
     const row=btn.closest('tr');
     const body=qs('#employeeTableBody');
     if(body.children.length>1){ row.remove(); syncPreferredOptionsToAllEmployees(); if(!isApplyingConfiguration) queueAutoPersist(); }
-    else{ alert('You need at least one employee.'); }
+    else{ alert(translate('errorDefineEmployee')); }
   }
 
   // ===== Holiday Register =====
@@ -472,20 +809,22 @@
     const body=qs('#holidayTableBody'); if(!body) return;
     const placeholder=body.querySelector('.holiday-empty'); if(placeholder) placeholder.remove();
     const tr=document.createElement('tr');
+    const holidayPlaceholder=translate('holidayNamePlaceholder');
+    const removeLabel=translate('removeButton');
     tr.innerHTML=
-      '<td><input type="date" value="'+dateStr+'" /></td>'+
-      '<td><input type="text" placeholder="Holiday name" value="'+nameStr+'" /></td>'+
-      '<td><button class="btn btn-danger" type="button" onclick="removeHolidayRow(this)">Remove</button></td>';
+      `<td><input type="date" value="${dateStr}" /></td>`+
+      `<td><input type="text" placeholder="${holidayPlaceholder}" value="${nameStr}" /></td>`+
+      `<td><button class="btn btn-danger" type="button" onclick="removeHolidayRow(this)">${removeLabel}</button></td>`;
     tr.dataset.source=source;
     body.appendChild(tr);
     if(!isApplyingConfiguration) queueAutoPersist();
   }  
-  function removeHolidayRow(btn){ const row=btn.closest('tr'); if(row){ row.remove(); if(!qs('#holidayTableBody tr')){ ensureHolidayPlaceholder(qs('#holidayTableBody'),'No public holidays configured.'); } if(!isApplyingConfiguration) queueAutoPersist(); } }
+  function removeHolidayRow(btn){ const row=btn.closest('tr'); if(row){ row.remove(); if(!qs('#holidayTableBody tr')){ ensureHolidayPlaceholder(qs('#holidayTableBody'),translate('holidayEmptyRegister')); } if(!isApplyingConfiguration) queueAutoPersist(); } }
   function clearHolidayTable(){
     const body=qs('#holidayTableBody');
     if(body){
       body.innerHTML='';
-      if(!isApplyingConfiguration){ ensureHolidayPlaceholder(body,'No public holidays configured.'); }
+      if(!isApplyingConfiguration){ ensureHolidayPlaceholder(body,translate('holidayEmptyRegister')); }
     }
     if(!isApplyingConfiguration) queueAutoPersist();
   }
@@ -538,7 +877,7 @@
     if(!body.querySelector('tr')){
       loadingRow=document.createElement('tr');
       loadingRow.className='holiday-empty holiday-loading';
-      loadingRow.innerHTML='<td colspan="3" class="muted">Loading public holidays…</td>';
+      loadingRow.innerHTML=`<td colspan="3" class="muted">${translate('loadingHolidays')}</td>`;
       body.appendChild(loadingRow);
     }
 
@@ -609,7 +948,7 @@
       if(loadingRow && loadingRow.isConnected){ loadingRow.remove(); }
       removeHolidayPlaceholders(body);
       if(Object.keys(refreshedExisting).length===0){
-        ensureHolidayPlaceholder(body,'No public holidays within selected period.');
+        ensureHolidayPlaceholder(body,translate('holidayNone'));
       }
       queueAutoPersist();
     }catch(error){
@@ -643,7 +982,7 @@
           removeDefaultHolidayRows(body);
           fallbackEntries.forEach(entry=> addHolidayRow(entry.date, entry.name, 'default'));
           removeHolidayPlaceholders(body);
-          alert('Primary holiday service is unavailable. Holidays have been loaded from an alternate source.');
+          alert(translate('holidayLoadFallback'));
           if(!isApplyingConfiguration) queueAutoPersist();
           return;
         }
@@ -652,9 +991,9 @@
       }
       removeDefaultHolidayRows(body);
       if(!body.querySelector('tr')){
-        ensureHolidayPlaceholder(body,'Unable to load public holidays. Please try again later.','holiday-error');
+        ensureHolidayPlaceholder(body,translate('holidayLoadFailure'),'holiday-error');
       }
-      alert('Unable to load public holidays from any online source. Please try again later.');
+      alert(translate('holidayLoadFailure'));
       if(!isApplyingConfiguration) queueAutoPersist();
     }
   }
@@ -665,7 +1004,7 @@
   function buildCfgShiftChecks(selectedPrefs){
     const box=qs('#cfgShiftChecks');
     const names=getGlobalShiftNames();
-    if(names.length===0){ box.innerHTML='<span class="muted">No shifts defined.</span>'; return; }
+    if(names.length===0){ box.innerHTML=`<span class="muted">${translate('noShiftsDefined')}</span>`; return; }
     box.innerHTML=names.map(n=>'<label class="inline"><input type="checkbox" value="'+n+'"> '+n+'</label>').join('');
     qsa('#cfgShiftChecks input[type=checkbox]').forEach(cb=>{ cb.checked=(selectedPrefs||[]).includes(cb.value); });
   }
@@ -682,7 +1021,7 @@
     const spareBox=qs('#cfgSpare'); if(spareBox) spareBox.checked=spareFlag;
   }
   function closeEmployeeConfig(){ const ov=qs('#employeeConfigOverlay'); ov.style.display='none'; ov.setAttribute('aria-hidden','true'); currentEmployeeRow=null; }
-  function addUnavailRow(dateStr=''){ const tr=document.createElement('tr'); tr.innerHTML='<td><input type="date" value="'+dateStr+'" /></td><td><button class="btn btn-danger" type="button" onclick="this.closest(\'tr\').remove()">Remove</button></td>'; qs('#cfgUnavailBody').appendChild(tr);}  
+  function addUnavailRow(dateStr=''){ const tr=document.createElement('tr'); const removeLabel=translate('removeButton'); tr.innerHTML=`<td><input type="date" value="${dateStr}" /></td><td><button class="btn btn-danger" type="button" onclick="this.closest('tr').remove()">${removeLabel}</button></td>`; qs('#cfgUnavailBody').appendChild(tr);}  
   function collectUnavailFromPanel(){ return qsa('#cfgUnavailBody input[type=date]').map(i=>i.value).filter(Boolean); }  
   function saveEmployeeConfig(){
     if(!currentEmployeeRow) return;
@@ -782,17 +1121,17 @@
   function validateInputs(){
     if(!qs('#startDate').value||!qs('#endDate').value) return false;
     const s=new Date(qs('#startDate').value), e=new Date(qs('#endDate').value);
-    if(s>=e){ alert('End date must be after start date.'); return false; }
+    if(s>=e){ alert(translate('errorInvalidPeriod')); return false; }
     const shiftRows=qsa('#shiftTableBody > tr');
     const hasRegularShift=shiftRows.some(row=>!(row.dataset?.refillTemplate==='true' || (row.querySelector('td:nth-child(1) input')?.value||'').trim().toLowerCase()==='refill'));
-    if(!hasRegularShift){ alert('Define at least one regular shift pattern.'); return false; }
-    if(qs('#employeeTableBody').children.length===0){ alert('Add at least one employee.'); return false; }
+    if(!hasRegularShift){ alert(translate('errorDefineShift')); return false; }
+    if(qs('#employeeTableBody').children.length===0){ alert(translate('errorDefineEmployee')); return false; }
     return true;
   }
   function generateSchedule(){
     const maxContinuousInput=parseInt(qs('#maxContinuousHours').value,10);
     scheduleData={ startDate:qs('#startDate').value, endDate:qs('#endDate').value, timezone:qs('#timezone').value, country:qs('#country').value, maxWeeklyHours:parseInt(qs('#maxWeeklyHours').value,10), maxConsecutiveDays:parseInt(qs('#maxConsecutiveDays').value,10), minDayOff:parseInt(qs('#minDayOff').value,10), holidays:collectHolidaysFromTable(), maxContinuousHours:Number.isFinite(maxContinuousInput)?maxContinuousInput:12 };
-    if(!validateInputs()){ alert('Fill required fields.'); return; }
+    if(!validateInputs()){ alert(translate('errorFillRequired')); return; }
     scheduleData.shifts=[];
     qsa('#shiftTableBody > tr').forEach(row=>{
       const name=(row.querySelector('td:nth-child(1) input')?.value||'').trim();
@@ -1256,9 +1595,12 @@
 
     if(weekLabel){
       if(calendarState.mode==='week' && calendarState.weeks.length){
-        weekLabel.textContent=`Week ${Math.min(calendarState.weekIndex+1, calendarState.weeks.length)} / ${calendarState.weeks.length}`;
+        weekLabel.textContent=translate('weekCounter',{
+          current: Math.min(calendarState.weekIndex+1, calendarState.weeks.length),
+          total: calendarState.weeks.length
+        });
       }else{
-        weekLabel.textContent='No weeks';
+        weekLabel.textContent=translate('noWeeks');
       }
     }
 
@@ -1299,7 +1641,7 @@
 
     const metric=document.createElement('div');
     metric.className='shift-summary-metric';
-    metric.textContent=`Staff ${totalAsg}/${totalReq}`;
+    metric.textContent=translate('shiftStaffing',{ assigned: totalAsg, required: totalReq });
     if(totalReq>0){
       if(totalAsg<totalReq){
         metric.classList.add('under');
@@ -1325,8 +1667,29 @@
     }else{
       const empty=document.createElement('div');
       empty.className='muted shift-empty';
-      empty.textContent='No staff assigned';
+      empty.textContent=translate('listNoStaff');
       wrapper.appendChild(empty);
+    }
+
+    const roleKeys=Object.keys(shift.requirements||{});
+    if(roleKeys.length){
+      const roleBreakdown=document.createElement('div');
+      roleBreakdown.className='shift-summary-roles';
+      roleKeys.forEach(roleKey=>{
+        const required=shift.requirements?.[roleKey] ?? 0;
+        const assigned=(shift.assigned?.[roleKey]||[]).length;
+        const line=document.createElement('div');
+        line.className='shift-role-line';
+        const nameSpan=document.createElement('span');
+        nameSpan.textContent=roleLabels[roleKey] || roleKey;
+        const countSpan=document.createElement('span');
+        countSpan.textContent=`${assigned}/${required}`;
+        countSpan.className=assigned<required ? 'role-count short' : 'role-count';
+        line.appendChild(nameSpan);
+        line.appendChild(countSpan);
+        roleBreakdown.appendChild(line);
+      });
+      wrapper.appendChild(roleBreakdown);
     }
 
     return wrapper;
@@ -1375,7 +1738,7 @@
     if(day.dayData?.isHoliday){
       const holidayBadge=document.createElement('span');
       holidayBadge.className='badge warn';
-      holidayBadge.textContent=day.dayData.holidayName || 'Holiday';
+      holidayBadge.textContent=day.dayData.holidayName || translate('holidayNamePlaceholder');
       meta.appendChild(holidayBadge);
     }
     if(meta.childNodes.length){
@@ -1391,7 +1754,7 @@
     }else if(day.inMonth){
       const empty=document.createElement('p');
       empty.className='muted';
-      empty.textContent='No shifts scheduled';
+      empty.textContent=translate('noShiftsScheduled');
       body.appendChild(empty);
     }else{
       const spacer=document.createElement('div');
@@ -1554,9 +1917,12 @@
     const weekLabel=qs('#personalWeekLabel');
     if(weekLabel){
       if(personalState.mode==='week' && personalState.weeks.length){
-        weekLabel.textContent=`Week ${Math.min(personalState.weekIndex+1, personalState.weeks.length)} / ${personalState.weeks.length}`;
+        weekLabel.textContent=translate('weekCounter',{
+          current: Math.min(personalState.weekIndex+1, personalState.weeks.length),
+          total: personalState.weeks.length
+        });
       }else{
-        weekLabel.textContent='No weeks';
+        weekLabel.textContent=translate('noWeeks');
       }
     }
     const prevBtn=qs('#personalPrevWeek');
@@ -1592,7 +1958,7 @@
     if(isDayOff && day.inMonth){
       const dayOffTag=document.createElement('div');
       dayOffTag.className='personal-dayoff-tag';
-      dayOffTag.textContent='Day Off';
+      dayOffTag.textContent=translate('dayOffLabel');
       tags.appendChild(dayOffTag);
     }
     assignments.forEach(assignment=>{
@@ -1606,7 +1972,7 @@
     if(!assignments.length && !isDayOff){
       const empty=document.createElement('div');
       empty.className='personal-empty';
-      empty.textContent='No shift';
+      empty.textContent=translate('noShiftLabel');
       tags.appendChild(empty);
     }
     cell.appendChild(tags);
@@ -1625,15 +1991,15 @@
     container.classList.remove('week-mode','month-mode');
 
     if(!personalRoster.length){
-      container.innerHTML='<p class="muted">Add employees to view personal schedules.</p>';
+      container.innerHTML=`<p class="muted">${translate('noPersonalRoster')}</p>`;
       return;
     }
     if(!scheduleResults.schedule || !scheduleResults.schedule.length){
-      container.innerHTML='<p class="muted">Run the scheduler to view personal schedules.</p>';
+      container.innerHTML=`<p class="muted">${translate('runSchedulerPersonal')}</p>`;
       return;
     }
     if(!selectedEmployee){
-      container.innerHTML='<p class="muted">Select an employee to view the Gantt chart.</p>';
+      container.innerHTML=`<p class="muted">${translate('selectEmployeePrompt')}</p>`;
       return;
     }
 
@@ -1652,7 +2018,7 @@
     const dayOffSet=ensureDayOffEntry(dayOffMap,selectedEmployee.name);
 
     if(!personalState.weeks.length){
-      container.innerHTML='<p class="muted">No schedule data within the selected range.</p>';
+      container.innerHTML=`<p class="muted">${translate('noDataInRange')}</p>`;
       return;
     }
 
@@ -1779,7 +2145,7 @@
     if(!sortedEntries.length){
       const empty=document.createElement('div');
       empty.className='muted';
-      empty.textContent='No assignments for this day.';
+      empty.textContent=translate('noAssignmentsForDay');
       ganttRows.appendChild(empty);
       return;
     }
@@ -1827,7 +2193,7 @@
     container.innerHTML='';
 
     if(!day.shifts || !day.shifts.length){
-      container.innerHTML='<p class="muted">No shifts configured for this day.</p>';
+      container.innerHTML=`<p class="muted">${translate('noShiftsConfigured')}</p>`;
       return;
     }
 
@@ -1853,7 +2219,7 @@
         const removeShiftBtn=document.createElement('button');
         removeShiftBtn.type='button';
         removeShiftBtn.className='btn btn-secondary btn-compact';
-        removeShiftBtn.textContent='Remove';
+        removeShiftBtn.textContent=translate('removeButton');
         removeShiftBtn.addEventListener('click',()=>{
           removeShiftFromDay(dayIndex, shiftIndex);
         });
@@ -1870,7 +2236,8 @@
         const roleTitle=document.createElement('div');
         roleTitle.className='assignment-role-title';
         const required=shift.requirements?.[role] ?? 0;
-        roleTitle.innerHTML=`<span>${roleLabels[role]||role}</span><span>Required: ${required}</span>`;
+        const requiredLabel=translate('roleRequiredLabel',{ count: required });
+        roleTitle.innerHTML=`<span>${roleLabels[role]||role}</span><span>${requiredLabel}</span>`;
         roleSection.appendChild(roleTitle);
 
         const chipList=document.createElement('div');
@@ -1882,7 +2249,7 @@
           chip.textContent=employeeName;
           const removeBtn=document.createElement('button');
           removeBtn.type='button';
-          removeBtn.setAttribute('aria-label',`Remove ${employeeName}`);
+          removeBtn.setAttribute('aria-label',translate('removeAssignmentAria',{ name: employeeName }));
           removeBtn.textContent='×';
           removeBtn.addEventListener('click',()=>{
             removeAssignmentFromShift(dayIndex, shiftIndex, role, employeeName);
@@ -1893,7 +2260,7 @@
         if(!assignedList.length){
           const empty=document.createElement('span');
           empty.className='muted';
-          empty.textContent='No assignments';
+          empty.textContent=translate('noAssignments');
           chipList.appendChild(empty);
         }
         roleSection.appendChild(chipList);
@@ -1905,7 +2272,7 @@
         const addBtn=document.createElement('button');
         addBtn.type='button';
         addBtn.className='btn btn-secondary btn-compact assignment-add-trigger';
-        addBtn.textContent='Add';
+        addBtn.textContent=translate('addLabel');
         addWrapper.appendChild(addBtn);
 
         if(availableEmployees.length){
@@ -1914,7 +2281,7 @@
           select.hidden=true;
           const placeholder=document.createElement('option');
           placeholder.value='';
-          placeholder.textContent=`Select ${roleLabels[role]||role}`;
+          placeholder.textContent=translate('selectRolePlaceholder',{ role: roleLabels[role]||role });
           select.appendChild(placeholder);
           availableEmployees.forEach(name=>{
             const option=document.createElement('option');
@@ -1945,7 +2312,7 @@
           addBtn.disabled=true;
           const noOptions=document.createElement('span');
           noOptions.className='muted assignment-add-empty';
-          noOptions.textContent='No available employees';
+          noOptions.textContent=translate('noAvailableEmployees');
           addWrapper.appendChild(noOptions);
         }
         roleSection.appendChild(addWrapper);
@@ -2086,7 +2453,7 @@
     container.innerHTML='';
 
     if(!calendarState.weeks.length){
-      container.innerHTML='<p class="muted">No schedule days available. Run the scheduler or adjust filters.</p>';
+      container.innerHTML=`<p class="muted">${translate('noScheduleDays')}</p>`;
       return;
     }
 
@@ -2120,7 +2487,7 @@
       calendarState.year=null;
       calendarState.weekIndex=0;
       updateCalendarControlsUI();
-      container.innerHTML='<p class="muted">Run the scheduler to view the calendar.</p>';
+      container.innerHTML=`<p class="muted">${translate('runSchedulerPrompt')}</p>`;
       return;
     }
     prepareCalendarState();
@@ -2288,7 +2655,7 @@
 
     const assignments = qs('#dayAssignments');
     if(assignments){
-      assignments.innerHTML = '<p class="muted">No shifts configured for this day.</p>';
+      assignments.innerHTML = `<p class="muted">${translate('noShiftsConfigured')}</p>`;
     }
 
     return true;
@@ -2345,7 +2712,7 @@
       personalState.year=null;
       personalState.weekIndex=0;
       updatePersonalControlsUI();
-      if(ganttContainer){ ganttContainer.innerHTML='<p class="muted">No schedule data available.</p>'; }
+      if(ganttContainer){ ganttContainer.innerHTML=`<p class="muted">${translate('noScheduleData')}</p>`; }
       return;
     }
 
@@ -2488,7 +2855,9 @@
           maxWeeklyHours:parseInt(qs('#maxWeeklyHours')?.value||'48',10),
           maxConsecutiveDays:parseInt(qs('#maxConsecutiveDays')?.value||'6',10),
           minDayOff:parseInt(qs('#minDayOff')?.value||'1',10),
-          maxContinuousHours:parseInt(qs('#maxContinuousHours')?.value||'12',10)
+          maxContinuousHours:parseInt(qs('#maxContinuousHours')?.value||'12',10),
+          language:currentLanguage,
+          theme:currentTheme
         },
         shifts:[],
         employees:[],
@@ -2559,6 +2928,8 @@
         if(Number.isFinite(config.meta.maxConsecutiveDays) && qs('#maxConsecutiveDays')) qs('#maxConsecutiveDays').value=config.meta.maxConsecutiveDays;
         if(Number.isFinite(config.meta.minDayOff) && qs('#minDayOff')) qs('#minDayOff').value=config.meta.minDayOff;
         if(Number.isFinite(config.meta.maxContinuousHours) && qs('#maxContinuousHours')) qs('#maxContinuousHours').value=config.meta.maxContinuousHours;
+        if(config.meta.language) setLanguage(config.meta.language);
+        if(config.meta.theme) setTheme(config.meta.theme);
       }
 
       const shiftBody=qs('#shiftTableBody');
@@ -2590,7 +2961,7 @@
         if(Array.isArray(config.holidays) && config.holidays.length){
           config.holidays.forEach(h=> addHolidayRow(h.date, h.name, h.source||'custom'));
         }else{
-          ensureHolidayPlaceholder(holidayBody,'No public holidays configured.');
+          ensureHolidayPlaceholder(holidayBody,translate('holidayEmptyRegister'));
         }
       }
 
@@ -2665,6 +3036,9 @@
     if(initialized) return;
     initialized=true;
 
+    setTheme(currentTheme);
+    setLanguage(currentLanguage);
+
     const startInput=qs('#startDate');
     const endInput=qs('#endDate');
     if(startInput && endInput){
@@ -2687,16 +3061,6 @@
     if(trigger){ trigger.addEventListener('click',generateSchedule); }
 
     qsa('#shiftTableBody > tr').forEach(updateEndTimeRow);
-
-    const testsBtn=qs('#runTests');
-    if(testsBtn){
-      testsBtn.addEventListener('click',()=>{
-        const output=qs('#testOutput');
-        if(output){
-          output.textContent='Tests passed: Shift end-time auto-calculation, Employee config panel, Day detail view with Gantt chart.';
-        }
-      });
-    }
 
     const modeSelect=qs('#calendarMode');
     if(modeSelect){
@@ -2871,4 +3235,28 @@
     }
   }
 
-  export { initializeApp, addShift, removeShift, openEmployeeConfig, removeEmployee, addEmployee, addHolidayRow, removeHolidayRow, loadDefaultHolidaysForCountry, clearHolidayTable, switchTab, closeEmployeeConfig, addUnavailRow, saveEmployeeConfig, closeDayDetail };
+  export {
+    initializeApp,
+    addShift,
+    removeShift,
+    openEmployeeConfig,
+    removeEmployee,
+    addEmployee,
+    addHolidayRow,
+    removeHolidayRow,
+    loadDefaultHolidaysForCountry,
+    clearHolidayTable,
+    switchTab,
+    closeEmployeeConfig,
+    addUnavailRow,
+    saveEmployeeConfig,
+    closeDayDetail,
+    setLanguage,
+    getCurrentLanguage,
+    onLanguageChange,
+    setTheme,
+    getCurrentTheme,
+    onThemeChange,
+    translate,
+    getLocaleStrings
+  };

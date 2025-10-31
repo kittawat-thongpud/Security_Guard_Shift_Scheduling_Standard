@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   initializeApp,
   addShift,
@@ -14,6 +14,14 @@ import {
   addUnavailRow,
   saveEmployeeConfig,
   closeDayDetail,
+  setLanguage,
+  getCurrentLanguage,
+  onLanguageChange,
+  translate,
+  setTheme,
+  getCurrentTheme,
+  onThemeChange,
+  getLocaleStrings,
 } from './appLogic.js';
 
 function handleRemoveShift(event) {
@@ -41,30 +49,71 @@ function handleCloseDayDetail() {
 }
 
 export default function App() {
+  const [language, setLanguageState] = useState(getCurrentLanguage());
+  const [theme, setThemeState] = useState(getCurrentTheme());
+
   useEffect(() => {
     initializeApp();
   }, []);
+
+  useEffect(() => {
+    const unsubscribeLang = onLanguageChange(setLanguageState);
+    const unsubscribeTheme = onThemeChange(setThemeState);
+    return () => {
+      unsubscribeLang();
+      unsubscribeTheme();
+    };
+  }, []);
+
+  const locale = getLocaleStrings(language);
+  const roleNames = locale.roles;
+  const t = (key, replacements) => translate(key, replacements, language);
+  const weekPlaceholder = t('weekCounter', { current: 1, total: 1 });
+
+  const handleLanguageSelect = (event) => {
+    setLanguage(event.target.value);
+  };
+
+  const handleThemeSelect = (event) => {
+    setTheme(event.target.value);
+  };
 
   return (
     <>
       <div className="container">
         <div className="header">
-          <h1>Enhanced Security Guard Scheduling</h1>
-          <p>Thailand calendar, role constraints, and editable rosters</p>
+          <h1>{t('headerTitle')}</h1>
+          <p>{t('headerSubtitle')}</p>
+          <div className="header-controls">
+            <label className="header-control">
+              <span>{t('languageLabel')}</span>
+              <select value={language} onChange={handleLanguageSelect}>
+                <option value="en">{t('languageEnglish')}</option>
+                <option value="th">{t('languageThai')}</option>
+              </select>
+            </label>
+            <label className="header-control">
+              <span>{t('themeLabel')}</span>
+              <select value={theme} onChange={handleThemeSelect}>
+                <option value="light">{t('themeLight')}</option>
+                <option value="dark">{t('themeDark')}</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="test-section">
-          <h2 className="section-title">Test Setup</h2>
+          <h2 className="section-title">{t('testSetupTitle')}</h2>
           <div className="form-grid">
             <div className="form-group">
-              <label>Schedule Period</label>
+              <label>{t('schedulePeriodLabel')}</label>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input type="date" id="startDate" required />
                 <input type="date" id="endDate" required />
               </div>
             </div>
             <div className="form-group">
-              <label htmlFor="timezone">Timezone</label>
+              <label htmlFor="timezone">{t('timezoneLabel')}</label>
               <select id="timezone" required defaultValue="Asia/Bangkok">
                 <option value="Asia/Bangkok">Asia/Bangkok</option>
                 <option value="UTC">UTC</option>
@@ -72,7 +121,7 @@ export default function App() {
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="country">Country for Holidays</label>
+              <label htmlFor="country">{t('countryLabel')}</label>
               <select id="country" required defaultValue="TH">
                 <option value="TH">Thailand</option>
                 <option value="US">United States</option>
@@ -81,23 +130,23 @@ export default function App() {
             </div>
           </div>
 
-          <h3 style={{ margin: '20px 0 10px' }}>Shift Pattern Registration</h3>
-          <table className="shift-table">
+          <h3 style={{ margin: '20px 0 10px' }}>{t('shiftPatternTitle')}</h3>
+              <table className="shift-table shift-table-patterns">
             <thead>
               <tr>
-                <th>Shift Name</th>
-                <th>Start Time</th>
-                <th>Size (hrs)</th>
-                <th>End Time</th>
-                <th>Guard Roles Needed</th>
-                <th>Supervisor Roles Needed</th>
-                <th>Senior Roles Needed</th>
-                <th>Actions</th>
+                <th>{t('shiftNameHeader')}</th>
+                <th>{t('startTimeHeader')}</th>
+                <th>{t('shiftSizeHeader')}</th>
+                <th>{t('endTimeHeader')}</th>
+                <th>{t('guardNeededHeader')}</th>
+                <th>{t('supervisorNeededHeader')}</th>
+                <th>{t('seniorNeededHeader')}</th>
+                <th>{t('actionsHeader')}</th>
               </tr>
             </thead>
             <tbody id="shiftTableBody">
               <tr>
-                <td><input type="text" defaultValue="Morning" placeholder="Shift name" /></td>
+                <td><input type="text" defaultValue={locale.shiftMorningName} placeholder={t('shiftNamePlaceholder')} /></td>
                 <td><input type="time" defaultValue="06:00" className="shift-start" /></td>
                 <td>
                   <select className="shift-size" defaultValue="8">
@@ -113,12 +162,12 @@ export default function App() {
                 <td><input type="number" defaultValue="0" min="0" /></td>
                 <td>
                   <button className="btn btn-secondary" type="button" onClick={handleRemoveShift}>
-                    Remove
+                    {t('removeButton')}
                   </button>
                 </td>
               </tr>
               <tr>
-                <td><input type="text" defaultValue="Afternoon" placeholder="Shift name" /></td>
+                <td><input type="text" defaultValue={locale.shiftAfternoonName} placeholder={t('shiftNamePlaceholder')} /></td>
                 <td><input type="time" defaultValue="14:00" className="shift-start" /></td>
                 <td>
                   <select className="shift-size" defaultValue="8">
@@ -134,12 +183,12 @@ export default function App() {
                 <td><input type="number" defaultValue="1" min="0" /></td>
                 <td>
                   <button className="btn btn-secondary" type="button" onClick={handleRemoveShift}>
-                    Remove
+                    {t('removeButton')}
                   </button>
                 </td>
               </tr>
               <tr>
-                <td><input type="text" defaultValue="Night" placeholder="Shift name" /></td>
+                <td><input type="text" defaultValue={locale.shiftNightName} placeholder={t('shiftNamePlaceholder')} /></td>
                 <td><input type="time" defaultValue="22:00" className="shift-start" /></td>
                 <td>
                   <select className="shift-size" defaultValue="8">
@@ -155,72 +204,72 @@ export default function App() {
                 <td><input type="number" defaultValue="0" min="0" /></td>
                 <td>
                   <button className="btn btn-secondary" type="button" onClick={handleRemoveShift}>
-                    Remove
+                    {t('removeButton')}
                   </button>
                 </td>
               </tr>
             </tbody>
           </table>
           <button className="btn btn-secondary" type="button" onClick={addShift}>
-            Add Shift
+            {t('addShiftButton')}
           </button>
 
-          <h3 style={{ margin: '22px 0 10px' }}>Employee Constraints</h3>
+          <h3 style={{ margin: '22px 0 10px' }}>{t('employeeConstraintsTitle')}</h3>
           <div className="form-grid">
             <div className="form-group">
-              <label htmlFor="maxWeeklyHours">Max Weekly Hours per Employee</label>
+              <label htmlFor="maxWeeklyHours">{t('maxWeeklyHoursLabel')}</label>
               <input type="number" id="maxWeeklyHours" defaultValue="48" min="1" required />
             </div>
             <div className="form-group">
-              <label htmlFor="maxConsecutiveDays">Max Consecutive Working Days</label>
+              <label htmlFor="maxConsecutiveDays">{t('maxConsecutiveDaysLabel')}</label>
               <input type="number" id="maxConsecutiveDays" defaultValue="6" min="1" required />
             </div>
             <div className="form-group">
-              <label htmlFor="minDayOff">Minimum Full Day Off After Max Consecutive</label>
+              <label htmlFor="minDayOff">{t('minDayOffLabel')}</label>
               <input type="number" id="minDayOff" defaultValue="1" min="1" required />
             </div>
             <div className="form-group">
-              <label htmlFor="maxContinuousHours">Max Continuous Hours Per Day</label>
+              <label htmlFor="maxContinuousHours">{t('maxContinuousHoursLabel')}</label>
               <input type="number" id="maxContinuousHours" defaultValue="12" min="1" required />
             </div>
           </div>
 
-          <h3 style={{ margin: '22px 0 10px' }}>Employee Roster</h3>
+          <h3 style={{ margin: '22px 0 10px' }}>{t('employeeRosterTitle')}</h3>
           <table className="employee-table">
             <thead>
               <tr>
-                <th>Employee Name</th>
-                <th>Role</th>
-                <th>Max Weekly Hours</th>
+                <th>{t('employeeNameHeader')}</th>
+                <th>{t('roleHeader')}</th>
+                <th>{t('maxHoursHeader')}</th>
                 <th>
-                  Unavailable Dates <span className="muted">(panel)</span>
+                  {t('unavailableDatesHeader')} <span className="muted">{t('unavailableDatesPanelHint')}</span>
                 </th>
-                <th>Preferred Shifts</th>
-                <th>Spare</th>
-                <th>Actions</th>
+                <th>{t('preferredShiftsHeader')}</th>
+                <th>{t('spareHeader')}</th>
+                <th>{t('actionsHeader')}</th>
               </tr>
             </thead>
             <tbody id="employeeTableBody">
               <tr>
-                <td><input type="text" defaultValue="John Smith" /></td>
+                <td><input type="text" defaultValue="นรินทร์ ป้อมปราการ" /></td>
                 <td>
                   <select defaultValue="supervisor">
-                    <option value="guard">Guard</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="senior">Senior Guard</option>
+                    <option value="guard">{roleNames.guard}</option>
+                    <option value="supervisor">{roleNames.supervisor}</option>
+                    <option value="senior">{roleNames.senior}</option>
                   </select>
                 </td>
                 <td><input type="number" defaultValue="48" min="1" /></td>
                 <td>
                   <input type="hidden" className="unavail-input" defaultValue="" />
                   <div className="chips unavail-preview">
-                    <span className="muted">none</span>
+                    <span className="muted">{t('noneLabel')}</span>
                   </div>
                 </td>
                 <td>
-                  <input type="hidden" className="prefs-input" defaultValue="Morning" />
+                  <input type="hidden" className="prefs-input" defaultValue={locale.shiftMorningName} />
                   <div className="chips prefs-preview">
-                    <span className="chip">Morning</span>
+                    <span className="chip">{locale.shiftMorningName}</span>
                   </div>
                 </td>
                 <td>
@@ -229,34 +278,34 @@ export default function App() {
                 <td>
                   <div className="inline">
                     <button className="btn btn-primary" type="button" onClick={handleOpenEmployeeConfig}>
-                      Edit
+                      {t('editButton')}
                     </button>
                     <button className="btn btn-secondary" type="button" onClick={handleRemoveEmployee}>
-                      Remove
+                      {t('removeButton')}
                     </button>
                   </div>
                 </td>
               </tr>
               <tr>
-                <td><input type="text" defaultValue="Maria Garcia" /></td>
+                <td><input type="text" defaultValue="สุรีย์พร วัฒนะ" /></td>
                 <td>
                   <select defaultValue="guard">
-                    <option value="guard">Guard</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="senior">Senior Guard</option>
+                    <option value="guard">{roleNames.guard}</option>
+                    <option value="supervisor">{roleNames.supervisor}</option>
+                    <option value="senior">{roleNames.senior}</option>
                   </select>
                 </td>
                 <td><input type="number" defaultValue="40" min="1" /></td>
                 <td>
                   <input type="hidden" className="unavail-input" defaultValue="" />
                   <div className="chips unavail-preview">
-                    <span className="muted">none</span>
+                    <span className="muted">{t('noneLabel')}</span>
                   </div>
                 </td>
                 <td>
-                  <input type="hidden" className="prefs-input" defaultValue="Afternoon" />
+                  <input type="hidden" className="prefs-input" defaultValue={locale.shiftAfternoonName} />
                   <div className="chips prefs-preview">
-                    <span className="chip">Afternoon</span>
+                    <span className="chip">{locale.shiftAfternoonName}</span>
                   </div>
                 </td>
                 <td>
@@ -265,10 +314,118 @@ export default function App() {
                 <td>
                   <div className="inline">
                     <button className="btn btn-primary" type="button" onClick={handleOpenEmployeeConfig}>
-                      Edit
+                      {t('editButton')}
                     </button>
                     <button className="btn btn-secondary" type="button" onClick={handleRemoveEmployee}>
-                      Remove
+                      {t('removeButton')}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="text" defaultValue="ชัชพงศ์ อินทร์ทอง" /></td>
+                <td>
+                  <select defaultValue="guard">
+                    <option value="guard">{roleNames.guard}</option>
+                    <option value="supervisor">{roleNames.supervisor}</option>
+                    <option value="senior">{roleNames.senior}</option>
+                  </select>
+                </td>
+                <td><input type="number" defaultValue="44" min="1" /></td>
+                <td>
+                  <input type="hidden" className="unavail-input" defaultValue="" />
+                  <div className="chips unavail-preview">
+                    <span className="muted">{t('noneLabel')}</span>
+                  </div>
+                </td>
+                <td>
+                  <input type="hidden" className="prefs-input" defaultValue={locale.shiftNightName} />
+                  <div className="chips prefs-preview">
+                    <span className="chip">{locale.shiftNightName}</span>
+                  </div>
+                </td>
+                <td>
+                  <input type="checkbox" className="spare-flag" />
+                </td>
+                <td>
+                  <div className="inline">
+                    <button className="btn btn-primary" type="button" onClick={handleOpenEmployeeConfig}>
+                      {t('editButton')}
+                    </button>
+                    <button className="btn btn-secondary" type="button" onClick={handleRemoveEmployee}>
+                      {t('removeButton')}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="text" defaultValue="วิภา จิตติ" /></td>
+                <td>
+                  <select defaultValue="senior">
+                    <option value="guard">{roleNames.guard}</option>
+                    <option value="supervisor">{roleNames.supervisor}</option>
+                    <option value="senior">{roleNames.senior}</option>
+                  </select>
+                </td>
+                <td><input type="number" defaultValue="42" min="1" /></td>
+                <td>
+                  <input type="hidden" className="unavail-input" defaultValue="" />
+                  <div className="chips unavail-preview">
+                    <span className="muted">{t('noneLabel')}</span>
+                  </div>
+                </td>
+                <td>
+                  <input type="hidden" className="prefs-input" defaultValue={locale.shiftMorningName} />
+                  <div className="chips prefs-preview">
+                    <span className="chip">{locale.shiftMorningName}</span>
+                  </div>
+                </td>
+                <td>
+                  <input type="checkbox" className="spare-flag" />
+                </td>
+                <td>
+                  <div className="inline">
+                    <button className="btn btn-primary" type="button" onClick={handleOpenEmployeeConfig}>
+                      {t('editButton')}
+                    </button>
+                    <button className="btn btn-secondary" type="button" onClick={handleRemoveEmployee}>
+                      {t('removeButton')}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="text" defaultValue="อดิเทพ รัตนกุล" /></td>
+                <td>
+                  <select defaultValue="guard">
+                    <option value="guard">{roleNames.guard}</option>
+                    <option value="supervisor">{roleNames.supervisor}</option>
+                    <option value="senior">{roleNames.senior}</option>
+                  </select>
+                </td>
+                <td><input type="number" defaultValue="36" min="1" /></td>
+                <td>
+                  <input type="hidden" className="unavail-input" defaultValue="" />
+                  <div className="chips unavail-preview">
+                    <span className="muted">{t('noneLabel')}</span>
+                  </div>
+                </td>
+                <td>
+                  <input type="hidden" className="prefs-input" defaultValue={locale.shiftAfternoonName} />
+                  <div className="chips prefs-preview">
+                    <span className="chip">{locale.shiftAfternoonName}</span>
+                  </div>
+                </td>
+                <td>
+                  <input type="checkbox" className="spare-flag" defaultChecked />
+                </td>
+                <td>
+                  <div className="inline">
+                    <button className="btn btn-primary" type="button" onClick={handleOpenEmployeeConfig}>
+                      {t('editButton')}
+                    </button>
+                    <button className="btn btn-secondary" type="button" onClick={handleRemoveEmployee}>
+                      {t('removeButton')}
                     </button>
                   </div>
                 </td>
@@ -276,18 +433,18 @@ export default function App() {
             </tbody>
           </table>
           <button className="btn btn-secondary" type="button" onClick={addEmployee}>
-            Add Employee
+            {t('addEmployeeButton')}
           </button>
 
-          <h3 style={{ margin: '22px 0 10px' }}>Holiday Register</h3>
+          <h3 style={{ margin: '22px 0 10px' }}>{t('holidayRegisterTitle')}</h3>
           <div className="form-grid">
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <table className="mini-table" aria-label="Holiday register">
+              <table className="mini-table" aria-label={t('holidayRegisterTitle')}>
                 <thead>
                   <tr>
-                    <th style={{ width: '30%' }}>Date</th>
-                    <th style={{ width: '55%' }}>Name</th>
-                    <th>Action</th>
+                    <th style={{ width: '30%' }}>{t('holidayDateHeader')}</th>
+                    <th style={{ width: '55%' }}>{t('holidayNameHeader')}</th>
+                    <th>{t('actionsHeader')}</th>
                   </tr>
                 </thead>
                 <tbody id="holidayTableBody" />
@@ -298,112 +455,102 @@ export default function App() {
                   type="button"
                   onClick={() => addHolidayRow()}
                 >
-                  Add Holiday
+                  {t('addHolidayButton')}
                 </button>
                 <button
                   className="btn btn-secondary"
                   type="button"
                   onClick={() => loadDefaultHolidaysForCountry().catch(() => {})}
                 >
-                  Load Country Defaults
+                  {t('loadCountryDefaultsButton')}
                 </button>
                 <button className="btn btn-danger" type="button" onClick={clearHolidayTable}>
-                  Clear All
+                  {t('clearAllButton')}
                 </button>
               </div>
               <p className="muted" style={{ marginTop: '6px' }}>
-                Defaults come from selected country and are filterable by date range.
+                {t('holidayHint')}
               </p>
             </div>
           </div>
 
           <div style={{ marginTop: '22px' }}>
             <button id="startTest" className="btn btn-primary" type="button">
-              Generate Schedule
+              {t('generateScheduleButton')}
             </button>
-          </div>
-
-          <div className="tests">
-            <div className="inline" style={{ gap: '8px', marginBottom: '8px' }}>
-              <button className="btn btn-secondary" id="runTests" type="button">
-                Run Self-Tests
-              </button>
-              <span className="muted">Verifies holidays, spares, day-off plan, and 8-8-8 upgrade.</span>
-            </div>
-            <pre id="testOutput">No tests run.</pre>
           </div>
         </div>
 
         <div className="test-section" id="resultsContainer" style={{ display: 'none' }}>
-          <h2 className="section-title">Schedule Results</h2>
+          <h2 className="section-title">{t('resultsTitle')}</h2>
           <div className="results-grid">
             <div className="metric-card">
-              <h3>Coverage Rate</h3>
+              <h3>{t('coverageRateTitle')}</h3>
               <div className="metric-value" id="coverageRate">
                 0%
               </div>
-              <p>Staffing vs Requirement</p>
+              <p>{t('coverageRateSubtitle')}</p>
             </div>
             <div className="metric-card">
-              <h3>Role Compliance</h3>
+              <h3>{t('roleComplianceTitle')}</h3>
               <div className="metric-value" id="roleCompliance">
                 0%
               </div>
-              <p>Role Requirements Met</p>
+              <p>{t('roleComplianceSubtitle')}</p>
             </div>
             <div className="metric-card">
-              <h3>Constraint Satisfaction</h3>
+              <h3>{t('constraintTitle')}</h3>
               <div className="metric-value" id="constraintCompliance">
                 0%
               </div>
-              <p>Rules Applied</p>
+              <p>{t('constraintSubtitle')}</p>
             </div>
             <div className="metric-card">
-              <h3>Processing Time</h3>
+              <h3>{t('processingTimeTitle')}</h3>
               <div className="metric-value" id="processingTime">
                 0ms
               </div>
-              <p>Algorithm Execution</p>
+              <p>{t('processingTimeSubtitle')}</p>
             </div>
           </div>
           <div className="tabs">
             <button className="tab active" type="button" onClick={(event) => switchTab(event, 'siteView')}>
-              Site Schedule View
+              {t('siteTab')}
             </button>
             <button className="tab" type="button" onClick={(event) => switchTab(event, 'personView')}>
-              Personal Schedules
+              {t('personalTab')}
             </button>
             <button className="tab" type="button" onClick={(event) => switchTab(event, 'constraintView')}>
-              Constraint Analysis
+              {t('constraintTab')}
             </button>
           </div>
           <div className="tab-content active" id="siteView">
-            <h3>Site Schedule Calendar</h3>
+            <h3>{t('siteTab')}</h3>
             <p>
-              Period: <span id="schedulePeriodDisplay" />
+              {t('schedulePeriodLabel')}: <span id="schedulePeriodDisplay" />
             </p>
             <div className="calendar-toolbar">
               <div className="toolbar-group">
-                <label htmlFor="calendarMode">Window</label>
+                <label htmlFor="calendarMode">{t('windowLabel')}</label>
                 <select id="calendarMode" defaultValue="week">
-                  <option value="week">Week</option>
-                  <option value="month">Month</option>
+                  <option value="week">{t('toolbarWeek')}</option>
+                  <option value="month">{t('toolbarMonth')}</option>
                 </select>
               </div>
               <div className="toolbar-group">
-                <label htmlFor="calendarMonth">Month</label>
+                <label htmlFor="calendarMonth">{t('monthLabel')}</label>
                 <select id="calendarMonth"></select>
               </div>
               <div className="toolbar-group">
-                <label htmlFor="calendarYear">Year</label>
+                <label htmlFor="calendarYear">{t('yearLabel')}</label>
                 <select id="calendarYear"></select>
               </div>
               <div className="toolbar-group week-controls" id="calendarWeekControls">
-                <button className="btn btn-secondary" type="button" id="calendarPrevWeek" aria-label="Previous week">
+                <button className="btn btn-secondary" type="button" id="calendarPrevWeek" aria-label={t('previous')}>
                   &lt;
                 </button>
-                <span id="calendarWeekLabel">Week 1 / 1</span>
-                <button className="btn btn-secondary" type="button" id="calendarNextWeek" aria-label="Next week">
+                <span id="calendarWeekLabel">{weekPlaceholder}</span>
+                <button className="btn btn-secondary" type="button" id="calendarNextWeek" aria-label={t('next')}>
                   &gt;
                 </button>
               </div>
@@ -411,33 +558,33 @@ export default function App() {
             <div className="calendar-view" id="siteCalendar" />
           </div>
           <div className="tab-content" id="personView">
-            <h3>Personal Schedules</h3>
+            <h3>{t('personalTab')}</h3>
             <div className="calendar-toolbar personal-toolbar">
               <div className="toolbar-group">
-                <label htmlFor="personalEmployeeSelect">Employee</label>
+                <label htmlFor="personalEmployeeSelect">{t('employeeLabel')}</label>
                 <select id="personalEmployeeSelect"></select>
               </div>
               <div className="toolbar-group">
-                <label htmlFor="personalMode">Window</label>
+                <label htmlFor="personalMode">{t('windowLabel')}</label>
                 <select id="personalMode" defaultValue="week">
-                  <option value="week">Week</option>
-                  <option value="month">Month</option>
+                  <option value="week">{t('toolbarWeek')}</option>
+                  <option value="month">{t('toolbarMonth')}</option>
                 </select>
               </div>
               <div className="toolbar-group">
-                <label htmlFor="personalMonth">Month</label>
+                <label htmlFor="personalMonth">{t('monthLabel')}</label>
                 <select id="personalMonth"></select>
               </div>
               <div className="toolbar-group">
-                <label htmlFor="personalYear">Year</label>
+                <label htmlFor="personalYear">{t('yearLabel')}</label>
                 <select id="personalYear"></select>
               </div>
               <div className="toolbar-group week-controls" id="personalWeekControls">
-                <button className="btn btn-secondary" type="button" id="personalPrevWeek" aria-label="Previous week">
+                <button className="btn btn-secondary" type="button" id="personalPrevWeek" aria-label={t('previous')}>
                   &lt;
                 </button>
-                <span id="personalWeekLabel">Week 1 / 1</span>
-                <button className="btn btn-secondary" type="button" id="personalNextWeek" aria-label="Next week">
+                <span id="personalWeekLabel">{weekPlaceholder}</span>
+                <button className="btn btn-secondary" type="button" id="personalNextWeek" aria-label={t('next')}>
                   &gt;
                 </button>
               </div>
@@ -445,18 +592,18 @@ export default function App() {
             <div className="personal-calendar" id="personalCalendar" />
           </div>
           <div className="tab-content" id="constraintView">
-            <h3>Constraint Analysis</h3>
+            <h3>{t('constraintTab')}</h3>
             <div className="schedule-visualization">
-              <h4>Weekly Hours</h4>
+              <h4>{t('constraintWeeklyHours')}</h4>
               <div id="hoursAnalysis" />
             </div>
             <div className="schedule-visualization">
-              <h4>Consecutive Days</h4>
+              <h4>{t('constraintConsecutiveDays')}</h4>
               <div id="consecutiveAnalysis" />
             </div>
           </div>
           <button id="exportResults" className="btn btn-primary" type="button">
-            Export Schedule
+            {t('exportButton')}
           </button>
         </div>
       </div>
@@ -464,63 +611,63 @@ export default function App() {
       <div id="employeeConfigOverlay" className="config-overlay" role="dialog" aria-modal="true" aria-hidden="true">
         <div className="config-panel">
           <div className="config-header">
-            <h2>Employee Config</h2>
+            <h2>{t('employeeConfigTitle')}</h2>
             <div className="inline">
               <button className="btn btn-secondary" type="button" onClick={handleCloseEmployeeConfig}>
-                Close
+                {t('closeButton')}
               </button>
             </div>
           </div>
           <div className="config-section">
             <div className="form-group">
-              <label htmlFor="cfgName">Employee Name</label>
+              <label htmlFor="cfgName">{t('employeeNameHeader')}</label>
               <input id="cfgName" type="text" />
             </div>
             <div className="form-group">
-              <label htmlFor="cfgRole">Role</label>
+              <label htmlFor="cfgRole">{t('roleHeader')}</label>
               <select id="cfgRole" defaultValue="guard">
-                <option value="guard">Guard</option>
-                <option value="supervisor">Supervisor</option>
-                <option value="senior">Senior Guard</option>
+                <option value="guard">{roleNames.guard}</option>
+                <option value="supervisor">{roleNames.supervisor}</option>
+                <option value="senior">{roleNames.senior}</option>
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="cfgHours">Max Weekly Hours</label>
+              <label htmlFor="cfgHours">{t('maxHoursHeader')}</label>
               <input id="cfgHours" type="number" min="1" defaultValue="48" />
             </div>
             <div className="form-group">
-              <label htmlFor="cfgSpare">
-                <input id="cfgSpare" type="checkbox" /> Mark as Spare
+              <label className="inline" style={{ gap: '8px' }}>
+                <input id="cfgSpare" type="checkbox" /> {t('markAsSpare')}
               </label>
             </div>
           </div>
           <div className="config-section">
-            <label>Unavailable Dates Register</label>
-            <table className="mini-table" aria-label="Unavailable dates">
+            <label>{t('unavailRegisterTitle')}</label>
+            <table className="mini-table" aria-label={t('unavailRegisterTitle')}>
               <thead>
                 <tr>
-                  <th style={{ width: '70%' }}>Date</th>
-                  <th>Action</th>
+                  <th style={{ width: '70%' }}>{t('holidayDateHeader')}</th>
+                  <th>{t('actionsHeader')}</th>
                 </tr>
               </thead>
               <tbody id="cfgUnavailBody" />
             </table>
             <div style={{ marginTop: '8px' }}>
               <button className="btn btn-secondary" type="button" onClick={handleAddUnavailabilityRow}>
-                Add Date
+                {t('addDateButton')}
               </button>
             </div>
           </div>
           <div className="config-section">
-            <label>Preferred Shifts</label>
+            <label>{t('preferredShiftsHeader')}</label>
             <div id="cfgShiftChecks" className="inline" style={{ flexWrap: 'wrap', gap: '14px' }} />
             <p className="muted" style={{ marginTop: '6px' }}>
-              Multiple selections allowed. Options sync with global shift list.
+              {t('preferredShiftsHint')}
             </p>
           </div>
           <div className="config-section">
             <button className="btn btn-primary" type="button" onClick={saveEmployeeConfig}>
-              Save
+              {t('saveButton')}
             </button>
           </div>
         </div>
@@ -529,46 +676,46 @@ export default function App() {
       <div id="dayDetailOverlay" className="detail-overlay" aria-modal="true" aria-hidden="true">
         <div className="day-panel">
           <div className="day-head">
-            <h2 id="dayTitle">Day Detail</h2>
+            <h2 id="dayTitle">{t('dayDetailTitle')}</h2>
             <div className="inline">
               <button className="btn btn-secondary" type="button" onClick={handleCloseDayDetail}>
-                Close
+                {t('closeButton')}
               </button>
             </div>
           </div>
           <div id="dayMeta" className="meta" />
           <div className="day-toolbar">
             <div className="day-toolbar-left">
-              <label htmlFor="dayShiftTemplate">Add shift</label>
+              <label htmlFor="dayShiftTemplate">{t('addShiftLabel')}</label>
               <div className="inline compact">
                 <select id="dayShiftTemplate" />
                 <button className="btn btn-secondary btn-compact" type="button" id="dayAddShift">
-                  Add Shift
+                  {t('addShiftButton')}
                 </button>
               </div>
             </div>
             <div className="day-toolbar-right">
               <span id="dayPendingHint" className="pending-hint">
-                Unsaved changes
+                {t('unsavedChanges')}
               </span>
               <button className="btn btn-secondary btn-compact" type="button" id="dayDiscardChanges">
-                Discard
+                {t('discardButton')}
               </button>
               <button className="btn btn-primary btn-compact" type="button" id="daySaveChanges" disabled>
-                Save
+                {t('saveButton')}
               </button>
             </div>
           </div>
           <div className="gantt-wrap">
             <div className="gantt-legend">
               <span>
-                <span className="legend-dot legend-guard" />{' '}Guard
+                <span className="legend-dot legend-guard" /> {roleNames.guard}
               </span>
               <span>
-                <span className="legend-dot legend-supervisor" />{' '}Supervisor
+                <span className="legend-dot legend-supervisor" /> {roleNames.supervisor}
               </span>
               <span>
-                <span className="legend-dot legend-senior" />{' '}Senior Guard
+                <span className="legend-dot legend-senior" /> {roleNames.senior}
               </span>
             </div>
             <div className="gantt-header">
