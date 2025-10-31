@@ -179,6 +179,10 @@ export default function App() {
               <label htmlFor="minDayOff">Minimum Full Day Off After Max Consecutive</label>
               <input type="number" id="minDayOff" defaultValue="1" min="1" required />
             </div>
+            <div className="form-group">
+              <label htmlFor="maxContinuousHours">Max Continuous Hours Per Day</label>
+              <input type="number" id="maxContinuousHours" defaultValue="12" min="1" required />
+            </div>
           </div>
 
           <h3 style={{ margin: '22px 0 10px' }}>Employee Roster</h3>
