@@ -137,6 +137,11 @@ tr:last-child td{border-bottom:none}
 .role-senior{background:#fef3c7;color:#d97706}
 .tests{margin-top:18px;padding:12px;background:var(--surface-soft);border-radius:8px}
 .tests pre{background:var(--surface-alt);color:var(--text);padding:12px;border-radius:6px;overflow:auto;border:1px solid var(--border)}
+.export-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:18px}
+.export-control{display:flex;flex-direction:column;gap:4px;min-width:180px}
+.export-control label{font-size:.85rem;font-weight:600;color:var(--secondary)}
+.export-buttons{display:flex;gap:10px;align-items:center}
+.export-buttons .btn{white-space:nowrap}
       /* ===== Day Detail + Gantt ===== */
     .detail-overlay{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;z-index:60}
     .day-panel{position:absolute;top:0;right:0;height:100%;width:min(70vw,1200px);background:var(--surface);box-shadow:-8px 0 24px rgba(0,0,0,.25);padding:20px;overflow:auto}
@@ -203,7 +208,20 @@ tr:last-child td{border-bottom:none}
       .calendar-week-header,.week-row,.month-week{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
       .calendar-toolbar .toolbar-group{flex:1 1 140px}
     }
-    .personal-calendar{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+.personal-summary{margin:16px 0;display:flex;flex-direction:column;gap:10px}
+.personal-summary .muted{text-align:center}
+.personal-happiness-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.08);display:flex;flex-direction:column;gap:10px}
+.personal-happiness-header{display:flex;justify-content:space-between;align-items:center;font-size:.95rem;color:var(--secondary)}
+.personal-happiness-score{font-size:1.6rem;font-weight:700;color:var(--primary)}
+.happiness-meter{position:relative;height:10px;background:var(--surface-soft);border-radius:999px;overflow:hidden}
+.happiness-meter-bar{position:absolute;top:0;left:0;bottom:0;background:linear-gradient(90deg,#22c55e,#2563eb);border-radius:999px}
+.personal-happiness-notes{display:flex;flex-wrap:wrap;gap:12px;font-size:.85rem;color:var(--secondary)}
+.personal-happiness-notes span{background:var(--surface-alt);padding:4px 8px;border-radius:6px}
+.happiness-formula{font-size:.85rem;color:var(--secondary)}
+.happiness-formula summary{cursor:pointer;font-weight:600;color:var(--primary)}
+.happiness-formula ul{margin:6px 0 0 18px;padding:0;list-style:disc}
+.happiness-formula li{margin-bottom:4px}
+.personal-calendar{display:flex;flex-direction:column;gap:12px;margin:16px 0}
     .personal-calendar.week-mode,.personal-calendar.month-mode{display:flex;flex-direction:column;gap:12px}
     .personal-calendar .calendar-week-header{margin-bottom:8px}
     .personal-week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px}
@@ -282,8 +300,11 @@ tr:last-child td{border-bottom:none}
     .task-list li{font-size:.9rem;margin-bottom:4px}
 
     .analysis-table{width:100%;border-collapse:collapse;margin-top:8px}
-    .analysis-table th,.analysis-table td{border:1px solid var(--border);padding:8px;text-align:left;font-size:.9rem;color:var(--text)}
-    .analysis-table th{background:var(--surface-soft);font-weight:600}
-    .analysis-table tr.warn-row td{background:#fef2f2;color:#b91c1c}
-    .analysis-table tr.warn-row:hover td{background:#fee2e2}
-    .analysis-table tr:hover td{background:var(--surface-alt)}
+.analysis-table th,.analysis-table td{border:1px solid var(--border);padding:8px;text-align:left;font-size:.9rem;color:var(--text)}
+.analysis-table th{background:var(--surface-soft);font-weight:600}
+.analysis-table tr.warn-row td{background:#fef2f2;color:#b91c1c}
+.analysis-table tr.warn-row:hover td{background:#fee2e2}
+.analysis-table tr:hover td{background:var(--surface-alt)}
+.analysis-note{margin-top:12px;font-size:.85rem;color:var(--secondary);background:var(--surface);border:1px dashed var(--border);border-radius:8px;padding:12px 14px}
+.analysis-note ul{margin:6px 0 0 18px;padding:0;list-style:disc}
+.analysis-note li{margin-bottom:4px}

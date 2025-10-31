@@ -1,274 +1,8 @@
-'use strict';
+import { defaultConfigTemplate } from './config/defaultConfig.js';
+import { localeStrings } from './config/localization.js';
 
-  // ===== Localization =====
-  const localeStrings={
-    en:{
-      languageLabel:'Language',
-      languageEnglish:'English',
-      languageThai:'Thai',
-      themeLabel:'Theme',
-      themeDark:'Dark',
-      themeLight:'Light',
-      headerTitle:'Enhanced Security Guard Scheduling',
-      headerSubtitle:'Thailand calendar, role constraints, and editable rosters',
-      testSetupTitle:'Test Setup',
-      schedulePeriodLabel:'Schedule Period',
-      timezoneLabel:'Timezone',
-      countryLabel:'Country for Holidays',
-      shiftPatternTitle:'Shift Pattern Registration',
-      shiftNameHeader:'Shift Name',
-      shiftNamePlaceholder:'Shift name',
-      shiftMorningName:'Morning',
-      shiftAfternoonName:'Afternoon',
-      shiftNightName:'Night',
-      startTimeHeader:'Start Time',
-      shiftSizeHeader:'Size (hrs)',
-      endTimeHeader:'End Time',
-      guardNeededHeader:'Guard Roles Needed',
-      supervisorNeededHeader:'Supervisor Roles Needed',
-      seniorNeededHeader:'Senior Roles Needed',
-      actionsHeader:'Actions',
-      addShiftButton:'Add Shift',
-      removeButton:'Remove',
-      employeeConstraintsTitle:'Employee Constraints',
-      maxWeeklyHoursLabel:'Max Weekly Hours per Employee',
-      maxConsecutiveDaysLabel:'Max Consecutive Working Days',
-      minDayOffLabel:'Minimum Full Day Off After Max Consecutive',
-      maxContinuousHoursLabel:'Max Continuous Hours Per Day',
-      employeeRosterTitle:'Employee Roster',
-      employeeNameHeader:'Employee Name',
-      employeeNamePlaceholder:'Employee name',
-      roleHeader:'Role',
-      maxHoursHeader:'Max Weekly Hours',
-      unavailableDatesHeader:'Unavailable Dates',
-      unavailRegisterTitle:'Unavailable Dates Register',
-      unavailableDatesPanelHint:'(panel)',
-      preferredShiftsHeader:'Preferred Shifts',
-      preferredShiftsHint:'Multiple selections allowed. Options sync with global shift list.',
-      spareHeader:'Spare',
-      markAsSpare:'Mark as Spare',
-      editButton:'Edit',
-      addEmployeeButton:'Add Employee',
-      employeeConfigTitle:'Employee Config',
-      holidayRegisterTitle:'Holiday Register',
-      holidayDateHeader:'Date',
-      holidayNameHeader:'Name',
-      holidayNamePlaceholder:'Holiday name',
-      addHolidayButton:'Add Holiday',
-      loadCountryDefaultsButton:'Load Country Defaults',
-      clearAllButton:'Clear All',
-      holidayHint:'Defaults come from selected country and are filterable by date range.',
-      generateScheduleButton:'Generate Schedule',
-      resultsTitle:'Schedule Results',
-      constraintWeeklyHours:'Weekly Hours',
-      constraintConsecutiveDays:'Consecutive Days',
-      coverageRateTitle:'Coverage Rate',
-      coverageRateSubtitle:'Staffing vs Requirement',
-      roleComplianceTitle:'Role Compliance',
-      roleComplianceSubtitle:'Role Requirements Met',
-      constraintTitle:'Constraint Satisfaction',
-      constraintSubtitle:'Rules Applied',
-      processingTimeTitle:'Processing Time',
-      processingTimeSubtitle:'Algorithm Execution',
-      siteTab:'Site Schedule View',
-      personalTab:'Personal Schedules',
-      constraintTab:'Constraint Analysis',
-      exportButton:'Export Schedule',
-      windowLabel:'Window',
-      employeeLabel:'Employee',
-      monthLabel:'Month',
-      yearLabel:'Year',
-      previous:'Previous',
-      next:'Next',
-      weekCounter:'Week {current} / {total}',
-      noWeeks:'No weeks',
-      noScheduleDays:'No schedule days available. Run the scheduler or adjust filters.',
-      runSchedulerPrompt:'Run the scheduler to view the calendar.',
-      noPersonalRoster:'Add employees to view personal schedules.',
-      runSchedulerPersonal:'Run the scheduler to view personal schedules.',
-      selectEmployeePrompt:'Select an employee to view the Gantt chart.',
-      noDataInRange:'No schedule data within the selected range.',
-      dayOffLabel:'Day Off',
-      noShiftLabel:'No shift',
-      noShiftsScheduled:'No shifts scheduled.',
-      noShiftsConfigured:'No shifts configured for this day.',
-      noShiftsDefined:'No shifts defined.',
-      holidayEmptyRegister:'No public holidays configured.',
-      noScheduleData:'No schedule data available.',
-      noAssignmentsForDay:'No assignments for this day.',
-      noAssignments:'No assignments',
-      noAvailableEmployees:'No available employees',
-      loadingHolidays:'Loading public holidays…',
-      holidayNone:'No public holidays within selected period.',
-      holidayErrorInvalidDates:'Enter valid schedule dates to load holidays.',
-      holidayPromptSetRange:'Set a schedule period to load public holidays.',
-      holidayLoadError:'Unable to load public holidays. Please try again later.',
-      holidayLoadFallback:'Primary holiday service is unavailable. Holidays have been loaded from OpenHolidays.org.',
-      holidayLoadFailure:'Unable to load public holidays from any online source. Please try again later.',
-      errorFillRequired:'Please fill in all required fields.',
-      errorDefineShift:'Define at least one shift pattern.',
-      errorDefineEmployee:'Add at least one employee.',
-      errorLockedShift:'This shift is locked and cannot be removed.',
-      lockedLabel:'Locked',
-      errorInvalidPeriod:'End date must be after start date.',
-      errorShortShift:'Skipping shift shorter than minimum duration.',
-      shiftStaffing:'Staff {assigned}/{required}',
-      listNoStaff:'No staff assigned',
-      noneLabel:'none',
-      roleRequiredLabel:'Required: {count}',
-      removeAssignmentAria:'Remove {name}',
-      selectRolePlaceholder:'Select {role}',
-      unsavedChanges:'Unsaved changes',
-      addDateButton:'Add Date',
-      closeButton:'Close',
-      saveButton:'Save',
-      discardButton:'Discard',
-      addShiftLabel:'Add shift',
-      addLabel:'Add',
-      dayDetailTitle:'Day Detail',
-      refillsDisabled:'Refills disabled; shortage remains',
-      toolbarWeek:'Week',
-      toolbarMonth:'Month',
-      weekdayShort:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
-      weekdayLong:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
-      monthNamesFull:['January','February','March','April','May','June','July','August','September','October','November','December'],
-      roles:{ guard:'Guard', supervisor:'Supervisor', senior:'Senior Guard' }
-    },
-    th:{
-      languageLabel:'ภาษา',
-      languageEnglish:'อังกฤษ',
-      languageThai:'ไทย',
-      themeLabel:'โหมดสี',
-      themeDark:'โหมดมืด',
-      themeLight:'โหมดสว่าง',
-      headerTitle:'ระบบจัดตารางเวรเจ้าหน้าที่รักษาความปลอดภัย',
-      headerSubtitle:'ปฏิทินไทย กำหนดข้อจำกัดบทบาท และปรับตารางได้สะดวก',
-      testSetupTitle:'การตั้งค่าทดสอบ',
-      schedulePeriodLabel:'ช่วงเวลาตารางเวร',
-      timezoneLabel:'เขตเวลา',
-      countryLabel:'ประเทศสำหรับวันหยุด',
-      shiftPatternTitle:'กำหนดรูปแบบกะ',
-      shiftNameHeader:'ชื่อกะ',
-      shiftNamePlaceholder:'ชื่อกะ',
-      shiftMorningName:'กะเช้า',
-      shiftAfternoonName:'กะบ่าย',
-      shiftNightName:'กะกลางคืน',
-      startTimeHeader:'เวลาเริ่ม',
-      shiftSizeHeader:'ชั่วโมง',
-      endTimeHeader:'เวลาสิ้นสุด',
-      guardNeededHeader:'ต้องการเจ้าหน้าที่รักษาความปลอดภัย',
-      supervisorNeededHeader:'ต้องการหัวหน้ากะ',
-      seniorNeededHeader:'ต้องการเจ้าหน้าที่อาวุโส',
-      actionsHeader:'ดำเนินการ',
-      addShiftButton:'เพิ่มกะ',
-      removeButton:'ลบ',
-      employeeConstraintsTitle:'ข้อจำกัดพนักงาน',
-      maxWeeklyHoursLabel:'ชั่วโมงทำงานสูงสุดต่อสัปดาห์',
-      maxConsecutiveDaysLabel:'จำนวนวันทำงานต่อเนื่องสูงสุด',
-      minDayOffLabel:'วันหยุดต่อเนื่องขั้นต่ำหลังทำงานเต็มจำนวน',
-      maxContinuousHoursLabel:'ชั่วโมงทำงานต่อเนื่องสูงสุดต่อวัน',
-      employeeRosterTitle:'รายชื่อพนักงาน',
-      employeeNameHeader:'ชื่อพนักงาน',
-      employeeNamePlaceholder:'ชื่อพนักงาน',
-      roleHeader:'บทบาท',
-      maxHoursHeader:'ชั่วโมงสูงสุดต่อสัปดาห์',
-      unavailableDatesHeader:'วันที่ไม่ว่าง',
-      unavailRegisterTitle:'ทะเบียนวันที่ไม่ว่าง',
-      unavailableDatesPanelHint:'(แผง)',
-      preferredShiftsHeader:'กะที่ต้องการ',
-      preferredShiftsHint:'เลือกได้หลายรายการ ระบบซิงค์กับรายการกะหลัก',
-      spareHeader:'สำรอง',
-      markAsSpare:'ทำเครื่องหมายเป็นสำรอง',
-      editButton:'แก้ไข',
-      addEmployeeButton:'เพิ่มพนักงาน',
-      employeeConfigTitle:'ตั้งค่าพนักงาน',
-      holidayRegisterTitle:'รายการวันหยุด',
-      holidayDateHeader:'วันที่',
-      holidayNameHeader:'ชื่อ',
-      holidayNamePlaceholder:'ชื่อวันหยุด',
-      addHolidayButton:'เพิ่มวันหยุด',
-      loadCountryDefaultsButton:'นำเข้าวันหยุดอ้างอิง',
-      clearAllButton:'ล้างทั้งหมด',
-      holidayHint:'ดึงจากประเทศที่เลือกและสามารถกรองตามช่วงวันที่ได้',
-      generateScheduleButton:'สร้างตารางเวร',
-      resultsTitle:'ผลลัพธ์ตารางเวร',
-      constraintWeeklyHours:'ชั่วโมงต่อสัปดาห์',
-      constraintConsecutiveDays:'จำนวนวันทำงานต่อเนื่อง',
-      coverageRateTitle:'อัตราการครอบคลุม',
-      coverageRateSubtitle:'พนักงานเทียบกับความต้องการ',
-      roleComplianceTitle:'ความครบถ้วนตามบทบาท',
-      roleComplianceSubtitle:'ตรงตามบทบาทที่ต้องการ',
-      constraintTitle:'การปฏิบัติตามข้อจำกัด',
-      constraintSubtitle:'กฎที่ใช้',
-      processingTimeTitle:'เวลาประมวลผล',
-      processingTimeSubtitle:'เวลาทำงานของอัลกอริทึม',
-      siteTab:'ตารางเวรหน้างาน',
-      personalTab:'ตารางเวรบุคคล',
-      constraintTab:'วิเคราะห์ข้อจำกัด',
-      exportButton:'ส่งออกตาราง',
-      windowLabel:'ช่วงมุมมอง',
-      employeeLabel:'พนักงาน',
-      monthLabel:'เดือน',
-      yearLabel:'ปี',
-      previous:'ก่อนหน้า',
-      next:'ถัดไป',
-      weekCounter:'สัปดาห์ {current} / {total}',
-      noWeeks:'ไม่มีข้อมูลสัปดาห์',
-      noScheduleDays:'ไม่มีข้อมูลตารางในช่วงนี้ โปรดสร้างตารางใหม่หรือปรับตัวกรอง',
-      runSchedulerPrompt:'สร้างตารางเพื่อแสดงปฏิทิน',
-      noPersonalRoster:'เพิ่มพนักงานเพื่อดูตารางบุคคล',
-      runSchedulerPersonal:'สร้างตารางเพื่อดูตารางบุคคล',
-      selectEmployeePrompt:'เลือกพนักงานเพื่อดูแผนผังกะ',
-      noDataInRange:'ไม่มีข้อมูลในช่วงที่เลือก',
-      dayOffLabel:'วันหยุด',
-      noShiftLabel:'ไม่มีเวร',
-      noShiftsScheduled:'ไม่มีการจัดเวร',
-      noShiftsConfigured:'ยังไม่ได้กำหนดเวรสำหรับวันนี้',
-      noShiftsDefined:'ยังไม่ได้กำหนดรูปแบบกะ',
-      holidayEmptyRegister:'ไม่มีวันหยุดในรายการ',
-      noScheduleData:'ไม่มีข้อมูลตารางในระบบ',
-      noAssignmentsForDay:'ไม่มีการมอบหมายในวันนี้',
-      noAssignments:'ไม่ได้จัดพนักงาน',
-      noAvailableEmployees:'ไม่มีพนักงานว่าง',
-      loadingHolidays:'กำลังโหลดวันหยุด…',
-      holidayNone:'ไม่มีวันหยุดในช่วงวันที่เลือก',
-      holidayErrorInvalidDates:'กรุณาระบุวันที่เริ่มและสิ้นสุดให้ถูกต้อง',
-      holidayPromptSetRange:'กรุณากำหนดช่วงวันที่เพื่อโหลดวันหยุด',
-      holidayLoadError:'ไม่สามารถโหลดวันหยุด โปรดลองอีกครั้ง',
-      holidayLoadFallback:'ไม่สามารถใช้บริการหลัก จึงใช้ข้อมูลจาก OpenHolidays.org',
-      holidayLoadFailure:'ไม่สามารถโหลดวันหยุดจากแหล่งข้อมูลออนไลน์ได้',
-      errorFillRequired:'กรุณากรอกข้อมูลที่จำเป็นให้ครบ',
-      errorDefineShift:'กรุณากำหนดรูปแบบกะอย่างน้อยหนึ่งรายการ',
-      errorDefineEmployee:'กรุณาเพิ่มพนักงานอย่างน้อยหนึ่งคน',
-      errorLockedShift:'ไม่สามารถลบกะที่ถูกล็อกได้',
-      lockedLabel:'ล็อก',
-      errorInvalidPeriod:'วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น',
-      errorShortShift:'ข้ามกะที่มีระยะเวลาสั้นเกินไป',
-      shiftStaffing:'พนักงาน {assigned}/{required}',
-      listNoStaff:'ไม่มีพนักงานในกะนี้',
-      noneLabel:'ไม่มี',
-      roleRequiredLabel:'ต้องการ: {count}',
-      removeAssignmentAria:'ลบ {name}',
-      selectRolePlaceholder:'เลือก{role}',
-      unsavedChanges:'มีการแก้ไขค้างอยู่',
-      addDateButton:'เพิ่มวันที่',
-      closeButton:'ปิด',
-      saveButton:'บันทึก',
-      discardButton:'ยกเลิก',
-      addShiftLabel:'เพิ่มกะ',
-      addLabel:'เพิ่ม',
-      dayDetailTitle:'รายละเอียดกะ',
-      refillsDisabled:'ปิดการเติมกะอัตโนมัติ ความขาดแคลนยังคงอยู่',
-      toolbarWeek:'รายสัปดาห์',
-      toolbarMonth:'รายเดือน',
-      weekdayShort:['อา','จ','อ','พ','พฤ','ศ','ส'],
-      weekdayLong:['วันอาทิตย์','วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์'],
-      monthNamesFull:['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'],
-      roles:{ guard:'เจ้าหน้าที่รักษาความปลอดภัย', supervisor:'หัวหน้ากะ', senior:'เจ้าหน้าที่อาวุโส' }
-    }
-  };
-
-  let currentLanguage='th';
+// ===== Localization =====
+let currentLanguage='th';
   let currentTheme='light';
   let dayNamesShort=localeStrings[currentLanguage].weekdayShort.slice();
   let dayNamesLong=localeStrings[currentLanguage].weekdayLong.slice();
@@ -276,6 +10,9 @@
   let roleLabels={ ...localeStrings[currentLanguage].roles };
   const languageListeners=new Set();
   const themeListeners=new Set();
+  const allowedExportFormats=['pdf','html','json','excel'];
+  let exportFormat='pdf';
+  const employeeHappiness=new Map();
 
   function getLocaleStrings(lang=currentLanguage){
     return localeStrings[lang] || localeStrings.en;
@@ -313,6 +50,7 @@
 
     updateCalendarControlsUI?.();
     updatePersonalControlsUI?.();
+    updateExportControlsState();
     if(scheduleResults?.schedule?.length){
       generateSiteCalendar?.();
       generatePersonalSchedules?.();
@@ -379,6 +117,288 @@
       ? items.map(x=>'<span class="chip">'+x+'</span>').join('')
       : `<span class="muted">${translate('noneLabel')}</span>`;
   };
+  const escapeHtml=str=>String(str||'').replace(/[&<>"']/g,m=>({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  })[m]||m);
+
+  function updateExportControlsState(){
+    const select=qs('#exportFormat');
+    if(select && select.value!==exportFormat){ select.value=exportFormat; }
+    const hasData=!!(scheduleResults?.schedule?.length);
+    const exportBtn=qs('#exportResults');
+    if(exportBtn){
+      exportBtn.disabled=!hasData;
+      exportBtn.setAttribute('aria-disabled', exportBtn.disabled?'true':'false');
+    }
+    const previewBtn=qs('#previewExport');
+    if(previewBtn){
+      const previewable=['pdf','html'].includes(exportFormat) && hasData;
+      previewBtn.disabled=!previewable;
+      previewBtn.setAttribute('aria-disabled', previewBtn.disabled?'true':'false');
+    }
+  }
+
+  function setExportFormatValue(value){
+    exportFormat=allowedExportFormats.includes(value)?value:'pdf';
+    updateExportControlsState();
+  }
+
+  function ensureScheduleReady(){
+    if(!scheduleResults || !Array.isArray(scheduleResults.schedule) || !scheduleResults.schedule.length){
+      alert(translate('runSchedulerPrompt'));
+      return false;
+    }
+    return true;
+  }
+
+  function triggerDownload(filename, blob){
+    if(!(blob instanceof Blob)) return;
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;
+    link.download=filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
+
+  function formatExportDate(dateStr){
+    if(!dateStr) return '';
+    const locale=currentLanguage==='th'?'th-TH':'en-US';
+    try{
+      const dateObj=new Date(dateStr+'T00:00:00');
+      if(Number.isNaN(dateObj.getTime())) return dateStr;
+      return new Intl.DateTimeFormat(locale,{ dateStyle:'full' }).format(dateObj);
+    }catch(err){
+      return dateStr;
+    }
+  }
+
+  function formatRequirementSummary(shift, asHtml){
+    const entries=Object.entries(shift?.requirements||{});
+    if(!entries.length) return '-';
+    const joiner=asHtml?'<br>':'\n';
+    return entries.map(([role,count])=>{
+      const label=escapeHtml(roleLabels[role]||role);
+      const value=escapeHtml(String(count ?? 0));
+      return asHtml?`${label}: ${value}`:`${label}: ${value}`;
+    }).join(joiner);
+  }
+
+  function formatAssignmentSummary(shift, asHtml){
+    const entries=Object.entries(shift?.assigned||{});
+    if(!entries.length) return translate('noAssignments');
+    const joiner=asHtml?'<br>':'\n';
+    return entries.map(([role,list])=>{
+      const label=escapeHtml(roleLabels[role]||role);
+      const names=(list||[]).length
+        ? (list||[]).map(name=>escapeHtml(name)).join(asHtml?', ':', ')
+        : escapeHtml(translate('noAssignments'));
+      return asHtml?`${label}: ${names}`:`${label}: ${names}`;
+    }).join(joiner);
+  }
+
+  function buildScheduleTableMarkup(asHtml){
+    const scheduleList=Array.isArray(scheduleResults?.schedule)?scheduleResults.schedule:[];
+    const rows=[];
+    scheduleList.forEach(day=>{
+      const shifts=Array.isArray(day.shifts)?day.shifts:[];
+      const dateLabel=formatExportDate(day.date || day.dateISO || '');
+      if(!shifts.length){
+        rows.push({
+          date:escapeHtml(dateLabel||day.date||''),
+          shift:escapeHtml(translate('noShiftsConfigured')),
+          time:'-',
+          req:'-',
+          assigned:escapeHtml(translate('noAssignments'))
+        });
+        return;
+      }
+      shifts.forEach(shift=>{
+        const timeRange=`${shift.startTime || ''} - ${shift.endTime || ''}`;
+        rows.push({
+          date:escapeHtml(dateLabel||day.date||''),
+          shift:escapeHtml(shift.name||''),
+          time:escapeHtml(timeRange),
+          req:asHtml?formatRequirementSummary(shift,true):formatRequirementSummary(shift,false),
+          assigned:asHtml?formatAssignmentSummary(shift,true):escapeHtml(formatAssignmentSummary(shift,false))
+        });
+      });
+    });
+    if(!rows.length){
+      rows.push({
+        date:'-',
+        shift:escapeHtml(translate('noScheduleData')),
+        time:'-',
+        req:'-',
+        assigned:escapeHtml(translate('noScheduleData'))
+      });
+    }
+    if(asHtml){
+      return rows.map(row=>`
+        <tr>
+          <td>${row.date}</td>
+          <td>${row.shift}</td>
+          <td>${row.time}</td>
+          <td>${row.req}</td>
+          <td>${row.assigned}</td>
+        </tr>`).join('');
+    }
+    return rows;
+  }
+
+  function buildExportMetadata(){
+    return {
+      generatedAt:new Date().toISOString(),
+      startDate:scheduleData?.startDate||'',
+      endDate:scheduleData?.endDate||'',
+      timezone:scheduleData?.timezone||''
+    };
+  }
+
+  function buildMetricsHtml(){
+    if(!scheduleResults?.metrics) return '';
+    const metrics=scheduleResults.metrics;
+    return `<ul class="metrics">
+      <li>${escapeHtml(translate('coverageRateTitle'))}: ${metrics.coverageRate ?? 0}%</li>
+      <li>${escapeHtml(translate('roleComplianceTitle'))}: ${metrics.roleCompliance ?? 0}%</li>
+      <li>${escapeHtml(translate('constraintTitle'))}: ${metrics.constraintCompliance ?? 0}%</li>
+      <li>${escapeHtml(translate('processingTimeTitle'))}: ${metrics.processingTime ?? 0}ms</li>
+    </ul>`;
+  }
+
+  function buildScheduleHtmlDocument({ forPrint=false }={}){
+    const meta=buildExportMetadata();
+    const tableRows=buildScheduleTableMarkup(true);
+    const metaBlock=`<div class="meta">
+      <div>${escapeHtml(translate('schedulePeriodLabel'))}: ${escapeHtml(meta.startDate||'-')} - ${escapeHtml(meta.endDate||'-')}</div>
+      <div>${escapeHtml(translate('timezoneLabel'))}: ${escapeHtml(meta.timezone||'-')}</div>
+      <div>${escapeHtml(translate('processingTimeTitle'))}: ${(scheduleResults?.metrics?.processingTime ?? 0)}ms</div>
+    </div>`;
+    const doc=`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(translate('resultsTitle'))}</title>
+  <style>
+    body{font-family:"Segoe UI",Tahoma,sans-serif;margin:24px;color:#1e293b;}
+    h1{font-size:24px;margin-bottom:12px;}
+    .meta{margin-bottom:16px;font-size:14px;color:#475569;}
+    .metrics{margin:0 0 16px 16px;padding:0;list-style:square;color:#475569;font-size:14px;}
+    table{width:100%;border-collapse:collapse;font-size:14px;}
+    th,td{border:1px solid #cbd5f5;padding:8px 10px;text-align:left;vertical-align:top;}
+    th{background:#e0e7ff;}
+    td{background:#ffffff;}
+    @media print{ body{margin:12mm;} table{page-break-inside:auto;} tr{page-break-inside:avoid; page-break-after:auto;} }
+  </style>
+  ${forPrint?'<script>window.onload=function(){window.focus();window.print();};</script>':''}
+</head>
+<body>
+  <h1>${escapeHtml(translate('resultsTitle'))}</h1>
+  ${metaBlock}
+  ${scheduleResults?.metrics ? buildMetricsHtml() : ''}
+  <table>
+    <thead>
+      <tr>
+        <th>${escapeHtml(translate('holidayDateHeader'))}</th>
+        <th>${escapeHtml(translate('shiftNameHeader'))}</th>
+        <th>${escapeHtml(translate('startTimeHeader'))} / ${escapeHtml(translate('endTimeHeader'))}</th>
+        <th>${escapeHtml(translate('exportRequirementsHeader'))}</th>
+        <th>${escapeHtml(translate('exportAssignmentsHeader'))}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows}
+    </tbody>
+  </table>
+</body>
+</html>`;
+    return doc;
+  }
+
+  function buildScheduleJsonPayload(){
+    const meta=buildExportMetadata();
+    return {
+      meta,
+      metrics:scheduleResults?.metrics||{},
+      schedule:scheduleResults?.schedule||[]
+    };
+  }
+
+  function buildExcelMarkup(){
+    const rows=buildScheduleTableMarkup(false);
+    const header=[
+      translate('holidayDateHeader'),
+      translate('shiftNameHeader'),
+      `${translate('startTimeHeader')} / ${translate('endTimeHeader')}`,
+      translate('exportRequirementsHeader'),
+      translate('exportAssignmentsHeader')
+    ];
+    const bodyRows=rows.map(row=>`<tr>
+      <td>${row.date}</td>
+      <td>${row.shift}</td>
+      <td>${row.time}</td>
+      <td>${row.req}</td>
+      <td>${row.assigned}</td>
+    </tr>`).join('');
+    return `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body>
+      <table border="1">
+        <thead><tr>${header.map(col=>`<th>${escapeHtml(col)}</th>`).join('')}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </body></html>`;
+  }
+
+  function handleExportClick(){
+    if(!ensureScheduleReady()) return;
+    const timestamp=new Date().toISOString().replace(/[:.]/g,'-');
+    if(exportFormat==='json'){
+      const payload=buildScheduleJsonPayload();
+      const blob=new Blob([JSON.stringify(payload,null,2)],{ type:'application/json' });
+      triggerDownload(`schedule-${timestamp}.json`, blob);
+      return;
+    }
+    if(exportFormat==='html'){
+      const html=buildScheduleHtmlDocument({ forPrint:false });
+      const blob=new Blob([html],{ type:'text/html' });
+      triggerDownload(`schedule-${timestamp}.html`, blob);
+      return;
+    }
+    if(exportFormat==='excel'){
+      const excelMarkup='\uFEFF'+buildExcelMarkup();
+      const blob=new Blob([excelMarkup],{ type:'application/vnd.ms-excel' });
+      triggerDownload(`schedule-${timestamp}.xls`, blob);
+      return;
+    }
+    // Default PDF via browser print dialog
+    const doc=buildScheduleHtmlDocument({ forPrint:true });
+    const win=window.open('', '_blank');
+    if(win){
+      win.document.write(doc);
+      win.document.close();
+    }else{
+      alert(translate('popupBlockedMessage'));
+    }
+  }
+
+  function handlePreviewClick(){
+    if(!ensureScheduleReady()) return;
+    if(['pdf','html'].includes(exportFormat)){
+      const doc=buildScheduleHtmlDocument({ forPrint:false });
+      const previewWin=window.open('', '_blank');
+      if(previewWin){
+        previewWin.document.write(doc);
+        previewWin.document.close();
+      }else{
+        alert(translate('popupBlockedMessage'));
+      }
+    }
+  }
 
   // ===== Time helpers =====
   function pad2(n){return String(n).padStart(2,'0');}
@@ -393,6 +413,17 @@
     const hours=Math.floor(minutes/60);
     const mins=minutes%60;
     return pad2(hours)+':'+pad2(mins);
+  }
+
+  function isNightShift(startTime,endTime){
+    if(!startTime || !endTime) return false;
+    const start=timeToMinutes(startTime);
+    let end=timeToMinutes(endTime);
+    if(Number.isNaN(start) || Number.isNaN(end)) return false;
+    if(end<=start){ end+=24*60; }
+    const startHour=Math.floor(start/60);
+    const endHour=Math.floor((end%1440)/60);
+    return startHour>=20 || endHour<6;
   }
 
   const roleTaskTemplates={
@@ -413,21 +444,28 @@
     ]
   };
 
-  const HOLIDAY_API_ENDPOINT='https://date.nager.at/api/v3/PublicHolidays';
-  const OPEN_HOLIDAY_ENDPOINT='https://openholidaysapi.org/PublicHolidays';
-  const MYHORA_HOLIDAYS_URL='https://www.myhora.com/calendar/ical/holiday.aspx?latest.json';
-  const holidayCache=new Map();
-  const openHolidayCache=new Map();
-  const myHoraCache=new Map();
-  let holidayFetchToken=0;
+const HOLIDAY_API_ENDPOINT='https://date.nager.at/api/v3/PublicHolidays';
+const OPEN_HOLIDAY_ENDPOINT='https://openholidaysapi.org/PublicHolidays';
+const MYHORA_HOLIDAYS_URL='https://www.myhora.com/calendar/ical/holiday.aspx?latest.json';
+const holidayCache=new Map();
+const openHolidayCache=new Map();
+const myHoraCache=new Map();
+let holidayFetchToken=0;
+
+const SUPPORTED_LANGUAGES=Object.keys(localeStrings);
+const DEFAULT_FALLBACK_ENDPOINTS={
+  primary:HOLIDAY_API_ENDPOINT,
+  open:OPEN_HOLIDAY_ENDPOINT,
+  myHora:MYHORA_HOLIDAYS_URL
+};
 
   const CONFIG_COOKIE_NAME='sgss_config_v1';
   const CONFIG_COOKIE_EXPIRY_DAYS=14;
   let isApplyingConfiguration=false;
   let autoPersistTimer=null;
 
-  const LOCAL_HOLIDAY_FALLBACK={
-    TH:{
+const LOCAL_HOLIDAY_FALLBACK={
+  TH:{
       2024:[
         {date:'2024-01-01',name:'New Year Day'},
         {date:'2024-02-10',name:'Chinese New Year'},
@@ -488,8 +526,16 @@
         {date:'2025-12-25',name:'Christmas Day'},
         {date:'2025-12-26',name:'Boxing Day'}
       ]
-    }
-  };
+  }
+};
+
+const publishDefaults={
+  defaultConfig:defaultConfigTemplate,
+  supportedLanguages:SUPPORTED_LANGUAGES,
+  holidayFallbackEndpoints:DEFAULT_FALLBACK_ENDPOINTS,
+  offlineHolidayData:LOCAL_HOLIDAY_FALLBACK,
+  localeStrings
+};
 
   function getFallbackHolidays(country, years){
     const countryData=LOCAL_HOLIDAY_FALLBACK[country];
@@ -1439,6 +1485,7 @@
     qs('#schedulePeriodDisplay').textContent=scheduleData.startDate+' to '+scheduleData.endDate;
     generateSiteCalendar(); generatePersonalSchedules(); generateConstraintAnalysis();
     qs('#resultsContainer').style.display='block';
+    updateExportControlsState();
   }
 
   function formatDateISO(date){ return date.toISOString().split('T')[0]; }
@@ -2022,7 +2069,7 @@
       return;
     }
 
-    container.appendChild(createWeekdayHeader());
+    // container.appendChild(createWeekdayHeader());
 
     if(personalState.mode==='month'){
       personalState.weeks.forEach(week=>{
@@ -2051,6 +2098,48 @@
   function renderPersonalView(){
     updatePersonalControlsUI();
     const selected=getSelectedPersonalEmployee();
+    const summary=qs('#personalSummary');
+    if(summary){
+      if(!selected){
+        summary.innerHTML=`<p class="muted">${escapeHtml(translate('selectEmployeePrompt'))}</p>`;
+      }else{
+        const happinessData=employeeHappiness.get(selected.name);
+        if(happinessData && Number.isFinite(happinessData.score) && (happinessData.totalShifts||0)>0){
+          const score=Math.max(0, Math.min(100, happinessData.score));
+          const matched=happinessData.preferredMatches||0;
+          const total=happinessData.totalShifts||0;
+          const weekend=happinessData.weekendShifts||0;
+          const night=happinessData.nightShifts||0;
+          summary.innerHTML=`
+            <div class="personal-happiness-card">
+              <div class="personal-happiness-header">
+                <span>${escapeHtml(translate('happinessLabel'))}</span>
+                <span class="personal-happiness-score">${escapeHtml(translate('happinessScore',{ score }))}</span>
+              </div>
+              <div class="happiness-meter"><div class="happiness-meter-bar" style="width:${score}%"></div></div>
+              <div class="personal-happiness-notes">
+                <span>${escapeHtml(translate('happinessPreferredSummary',{ matched, total }))}</span>
+                <span>${escapeHtml(translate('happinessWeekendSummary',{ weekend, total }))}</span>
+                <span>${escapeHtml(translate('happinessNightSummary',{ night, total }))}</span>
+              </div>
+              <details class="happiness-formula">
+                <summary>${escapeHtml(translate('happinessFormulaHeading'))}</summary>
+                <p>${escapeHtml(translate('happinessFormulaIntro'))}</p>
+                <ul>
+                  <li>${escapeHtml(translate('happinessFormulaPreferred'))}</li>
+                  <li>${escapeHtml(translate('happinessFormulaWeekend'))}</li>
+                  <li>${escapeHtml(translate('happinessFormulaNight'))}</li>
+                  <li>${escapeHtml(translate('happinessFormulaHours'))}</li>
+                  <li>${escapeHtml(translate('happinessFormulaStreak'))}</li>
+                  <li>${escapeHtml(translate('happinessFormulaRest'))}</li>
+                </ul>
+              </details>
+            </div>`;
+        }else{
+          summary.innerHTML=`<p class="muted">${escapeHtml(translate('happinessUnknown'))}</p>`;
+        }
+      }
+    }
     renderPersonalGantt(selected);
   }
 
@@ -2457,7 +2546,7 @@
       return;
     }
 
-    container.appendChild(createWeekdayHeader());
+    // container.appendChild(createWeekdayHeader());
 
     if(calendarState.mode==='month'){
       container.classList.add('month-mode');
@@ -2712,6 +2801,8 @@
       personalState.year=null;
       personalState.weekIndex=0;
       updatePersonalControlsUI();
+      const summary=qs('#personalSummary');
+      if(summary){ summary.innerHTML=`<p class="muted">${escapeHtml(translate('runSchedulerPersonal'))}</p>`; }
       if(ganttContainer){ ganttContainer.innerHTML=`<p class="muted">${translate('noScheduleData')}</p>`; }
       return;
     }
@@ -2776,8 +2867,19 @@
     if(!hours || !consecutive) return;
 
     const employeeStats=new Map();
+    employeeHappiness.clear();
     scheduleData.employees.forEach(emp=>{
-      employeeStats.set(emp.name,{ ...emp, totalMinutes:0, workingDates:[] });
+      const preferred=Array.isArray(emp.preferredShifts)?emp.preferredShifts.map(s=>s.toLowerCase()):[];
+      employeeStats.set(emp.name,{
+        ...emp,
+        totalMinutes:0,
+        workingDates:[],
+        totalShifts:0,
+        preferredMatches:0,
+        weekendShifts:0,
+        nightShifts:0,
+        preferredSet:new Set(preferred)
+      });
     });
 
     scheduleResults.schedule.forEach(day=>{
@@ -2786,12 +2888,29 @@
         Object.entries(shift.assigned).forEach(([role,names])=>{
           names.forEach(name=>{
             if(!employeeStats.has(name)){
-              employeeStats.set(name,{ name, role, maxWeeklyHours:scheduleData.maxWeeklyHours, totalMinutes:0, workingDates:[] });
+              employeeStats.set(name,{
+                name,
+                role,
+                maxWeeklyHours:scheduleData.maxWeeklyHours,
+                preferredShifts:[],
+                totalMinutes:0,
+                workingDates:[],
+                totalShifts:0,
+                preferredMatches:0,
+                weekendShifts:0,
+                nightShifts:0,
+                preferredSet:new Set()
+              });
             }
             const stat=employeeStats.get(name);
             stat.role=role;
             stat.totalMinutes+=durationMins;
             stat.workingDates.push(day.date);
+            stat.totalShifts+=1;
+            const shiftName=(shift.name||'').toLowerCase();
+            if(stat.preferredSet && stat.preferredSet.has(shiftName)){ stat.preferredMatches+=1; }
+            if(day.isWeekend){ stat.weekendShifts+=1; }
+            if(isNightShift(shift.startTime, shift.endTime)){ stat.nightShifts+=1; }
           });
         });
       });
@@ -2807,40 +2926,82 @@
       const totalHours=(stat.totalMinutes/60).toFixed(1);
       const allowedHours=((stat.maxWeeklyHours||scheduleData.maxWeeklyHours)*totalWeeks).toFixed(1);
       const withinHours=parseFloat(totalHours)<=parseFloat(allowedHours);
-      hoursRows.push(
-        '<tr class="'+(withinHours?'':'warn-row')+'">'+
-          '<td>'+stat.name+'</td>'+ 
-          '<td>'+totalHours+'h</td>'+ 
-          '<td>'+allowedHours+'h</td>'+ 
-          '<td>'+(withinHours?'Within limit':'Exceeds limit')+'</td>'+ 
-        '</tr>'
-      );
+      const totalShifts=Math.max(0, stat.totalShifts||0);
+      const preferredMatches=Math.min(stat.preferredMatches||0, totalShifts);
+      const weekendShifts=stat.weekendShifts||0;
+      const nightShifts=stat.nightShifts||0;
 
       const { longest, sequences, restGaps }=analyzeConsecutiveDays(stat.workingDates);
       const overMax=sequences.some(len=>len>(scheduleData.maxConsecutiveDays||6));
       const insufficientRest=restGaps.some(gap=>gap>0 && gap<(scheduleData.minDayOff||1));
+
+      let happiness=100;
+      if(totalShifts>0){
+        const preferredRatio=preferredMatches/totalShifts;
+        const weekendRatio=weekendShifts/totalShifts;
+        const nightRatio=nightShifts/totalShifts;
+        happiness-=Math.round((1-preferredRatio)*40);
+        happiness-=Math.round(weekendRatio*15);
+        happiness-=Math.round(nightRatio*10);
+      }
+      if(!withinHours){ happiness-=15; }
+      if(overMax){ happiness-=15; }
+      if(insufficientRest){ happiness-=10; }
+      happiness=Math.max(0, Math.min(100, Math.round(happiness)));
+      const happinessCell=totalShifts>0?`${happiness}%`:'--';
+      stat.happiness=happiness;
+      employeeHappiness.set(stat.name,{
+        score:happiness,
+        preferredMatches,
+        totalShifts,
+        weekendShifts,
+        nightShifts
+      });
+
+      hoursRows.push(
+        '<tr class="'+(withinHours?'':'warn-row')+'">'+
+          '<td>'+escapeHtml(stat.name)+'</td>'+ 
+          '<td>'+totalHours+'h</td>'+ 
+          '<td>'+allowedHours+'h</td>'+ 
+          '<td>'+(withinHours?escapeHtml(translate('analysisWithinLimit')):escapeHtml(translate('analysisExceedsLimit')))+'</td>'+ 
+          '<td>'+happinessCell+'</td>'+ 
+        '</tr>'
+      );
+
+      const restMessage=insufficientRest
+        ? escapeHtml(translate('analysisRestUnder',{ days: scheduleData.minDayOff||1 }))
+        : escapeHtml(translate('analysisOk'));
+
       consecutiveRows.push(
         '<tr class="'+((overMax||insufficientRest)?'warn-row':'')+'">'+
-          '<td>'+stat.name+'</td>'+ 
-          '<td>'+longest+' days</td>'+ 
-          '<td>'+(scheduleData.maxConsecutiveDays||6)+' days</td>'+ 
-          '<td>'+(overMax?'Streak too long':'OK')+'</td>'+ 
-          '<td>'+(insufficientRest?'Rest under '+(scheduleData.minDayOff||1)+' day(s)':'OK')+'</td>'+ 
+          '<td>'+escapeHtml(stat.name)+'</td>'+ 
+          '<td>'+longest+' '+escapeHtml(translate('analysisDays'))+'</td>'+ 
+          '<td>'+(scheduleData.maxConsecutiveDays||6)+' '+escapeHtml(translate('analysisDays'))+'</td>'+ 
+          '<td>'+(overMax?escapeHtml(translate('analysisStreakTooLong')):escapeHtml(translate('analysisOk')))+'</td>'+ 
+          '<td>'+restMessage+'</td>'+ 
         '</tr>'
       );
     });
 
     hours.innerHTML=
       '<table class="analysis-table">'+
-        '<thead><tr><th>Employee</th><th>Scheduled Hours</th><th>Allowed Hours</th><th>Status</th></tr></thead>'+ 
-        '<tbody>'+ (hoursRows.join('') || '<tr><td colspan="4" class="muted">No assignments scheduled.</td></tr>') +'</tbody>'+ 
+        '<thead><tr><th>'+escapeHtml(translate('employeeNameHeader'))+'</th><th>'+escapeHtml(translate('analysisScheduledHours'))+'</th><th>'+escapeHtml(translate('analysisAllowedHours'))+'</th><th>'+escapeHtml(translate('analysisStatus'))+'</th><th>'+escapeHtml(translate('analysisHappiness'))+'</th></tr></thead>'+ 
+        '<tbody>'+ (hoursRows.join('') || '<tr><td colspan="5" class="muted">'+escapeHtml(translate('noAssignments'))+'</td></tr>') +'</tbody>'+ 
       '</table>';
 
     consecutive.innerHTML=
       '<table class="analysis-table">'+
-        '<thead><tr><th>Employee</th><th>Longest Streak</th><th>Max Allowed</th><th>Streak Status</th><th>Rest Compliance</th></tr></thead>'+ 
-        '<tbody>'+ (consecutiveRows.join('') || '<tr><td colspan="5" class="muted">No assignments scheduled.</td></tr>') +'</tbody>'+ 
+        '<thead><tr><th>'+escapeHtml(translate('employeeNameHeader'))+'</th><th>'+escapeHtml(translate('analysisLongestStreak'))+'</th><th>'+escapeHtml(translate('analysisMaxAllowed'))+'</th><th>'+escapeHtml(translate('analysisStreakStatus'))+'</th><th>'+escapeHtml(translate('analysisRestCompliance'))+'</th></tr></thead>'+ 
+        '<tbody>'+ (consecutiveRows.join('') || '<tr><td colspan="5" class="muted">'+escapeHtml(translate('noAssignments'))+'</td></tr>') +'</tbody>'+ 
       '</table>';
+
+    const analysisNote=qs('#constraintFormulaNote') || document.createElement('div');
+    analysisNote.id='constraintFormulaNote';
+    analysisNote.className='analysis-note';
+    analysisNote.innerHTML=`<strong>${escapeHtml(translate('happinessFormulaHeading'))}</strong><p>${escapeHtml(translate('happinessFormulaIntro'))}</p><ul><li>${escapeHtml(translate('happinessFormulaPreferred'))}</li><li>${escapeHtml(translate('happinessFormulaWeekend'))}</li><li>${escapeHtml(translate('happinessFormulaNight'))}</li><li>${escapeHtml(translate('happinessFormulaHours'))}</li><li>${escapeHtml(translate('happinessFormulaStreak'))}</li><li>${escapeHtml(translate('happinessFormulaRest'))}</li></ul>`;
+    consecutive.parentElement?.appendChild(analysisNote);
+
+    renderPersonalView();
   }
 
   function gatherConfigurationSnapshot(){
@@ -3036,6 +3197,10 @@
     if(initialized) return;
     initialized=true;
 
+    if(typeof window!=='undefined'){
+      window.publishDefaults=publishDefaults;
+    }
+
     setTheme(currentTheme);
     setLanguage(currentLanguage);
 
@@ -3221,6 +3386,23 @@
       });
     }
 
+    const exportSelect=qs('#exportFormat');
+    if(exportSelect){
+      exportSelect.addEventListener('change',event=>{
+        setExportFormatValue(event.target.value);
+      });
+    }
+    const exportBtn=qs('#exportResults');
+    if(exportBtn){
+      exportBtn.addEventListener('click',handleExportClick);
+    }
+    const previewBtn=qs('#previewExport');
+    if(previewBtn){
+      previewBtn.addEventListener('click',handlePreviewClick);
+    }
+
+    updateExportControlsState();
+
     configurationRestored=loadConfigurationFromCookie();
 
     document.addEventListener('input', queueAutoPersist);
@@ -3258,5 +3440,6 @@
     getCurrentTheme,
     onThemeChange,
     translate,
-    getLocaleStrings
+    getLocaleStrings,
+    publishDefaults
   };

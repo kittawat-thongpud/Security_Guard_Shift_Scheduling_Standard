@@ -589,6 +589,7 @@ export default function App() {
                 </button>
               </div>
             </div>
+            <div className="personal-summary" id="personalSummary" />
             <div className="personal-calendar" id="personalCalendar" />
           </div>
           <div className="tab-content" id="constraintView">
@@ -602,9 +603,25 @@ export default function App() {
               <div id="consecutiveAnalysis" />
             </div>
           </div>
-          <button id="exportResults" className="btn btn-primary" type="button">
-            {t('exportButton')}
-          </button>
+          <div className="export-controls">
+            <div className="export-control">
+              <label htmlFor="exportFormat">{t('exportFormatLabel')}</label>
+              <select id="exportFormat" defaultValue="pdf">
+                <option value="pdf">{t('exportFormatPdf')}</option>
+                <option value="html">{t('exportFormatHtml')}</option>
+                <option value="json">{t('exportFormatJson')}</option>
+                <option value="excel">{t('exportFormatExcel')}</option>
+              </select>
+            </div>
+            <div className="export-buttons">
+              <button id="previewExport" className="btn btn-secondary btn-compact" type="button">
+                {t('previewButton')}
+              </button>
+              <button id="exportResults" className="btn btn-primary" type="button">
+                {t('exportButton')}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
